@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#1b1035">
+  <meta name="description" content="Halal Haram Detector – ein absurd schnelles Meme-Reaktionsspiel: Produkt sehen, entscheiden, Zutaten checken. Unterhaltung, kein religiöses Rechtsgutachten.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Halal Haram Detector</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-screen="start">
+  <canvas id="world-canvas" aria-hidden="true"></canvas>
+
+  <div id="app">
+    <!-- ===================== START ===================== -->
+    <section class="screen menu-screen" id="scr-start" aria-label="Startbildschirm">
+      <div class="start-top">
+        <div class="pill coins" title="Detector-Coins">🪙 <b id="st-coins">0</b></div>
+        <div class="pill plevel" title="Spieler-Level">⭐ LVL <b id="st-plevel">1</b><span class="xpbar"><i id="st-xpbar"></i></span></div>
+      </div>
+
+      <h1 class="logo" aria-label="Halal Haram Detector">
+        <span class="lg lg1">HALAL</span>
+        <span class="lg lg2">HARAM</span>
+        <span class="lg lg3">DETECTOR</span>
+      </h1>
+      <p class="subtitle">„BROTHER… CHECK THE INGREDIENTS.“</p>
+
+      <div class="showcase">
+        <button class="start-det" id="start-det" type="button" aria-label="Detector (antippen)"></button>
+        <div class="showcase-item" id="showcase-item"></div>
+      </div>
+
+      <nav class="menu">
+        <button class="btn play" data-action="play">▶ PLAY</button>
+        <div class="menu-row">
+          <button class="btn c-shop" data-action="shop">🛒 SHOP</button>
+          <button class="btn c-board" data-action="leaderboard">🏆 LEADERBOARD</button>
+        </div>
+        <div class="menu-row">
+          <button class="btn c-set" data-action="settings">⚙️ SETTINGS</button>
+          <button class="btn c-duel" data-action="duel">⚔️ DUELL 2P</button>
+        </div>
+        <button class="linkbtn" data-action="help">❓ So funktioniert’s</button>
+      </nav>
+
+      <div class="records">🏅 BEST <b id="st-best">0</b> · 📅 HEUTE <b id="st-daily">0</b></div>
+      <p class="disclaimer">Unterhaltung – kein religiöses Rechtsgutachten. Im Spiel zählt nur, was im Spiel auf der Packung bzw. in der Zutatenliste steht.</p>
+    </section>
+
+    <!-- ===================== STADTKARTE ===================== -->
+    <section class="screen menu-screen" id="scr-map" aria-label="Stadtkarte">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>🗺️ STADTKARTE</h2>
+        <span class="pill" id="map-xp">0 XP</span>
+      </header>
+      <p class="hint">XP aus jeder Runde schalten neue Stadtbereiche frei. Höhere Bereiche starten schneller – und geben mehr Punkte.</p>
+      <div class="area-list" id="map-list"></div>
+    </section>
+
+    <!-- ===================== SPIEL ===================== -->
+    <section class="screen" id="scr-game" aria-label="Spiel">
+      <header class="hud">
+        <div class="hud-row">
+          <div class="hs hs-score"><small>SCORE</small><b id="hud-score">0</b></div>
+          <div class="hs hs-combo"><small>COMBO <em id="hud-mult">×1,0</em></small><b id="hud-combo">x0</b></div>
+          <div class="hs hs-aura"><small>AURA</small><b id="hud-aura">+0</b></div>
+          <div class="hs hs-time"><small>TIME</small><b id="hud-time">0,00s</b></div>
+        </div>
+        <div class="hud-row2">
+          <div class="lives" id="hud-lives" aria-label="Leben"></div>
+          <div class="lvl" id="hud-level">LVL 1</div>
+          <button class="icon-btn" data-action="pause" aria-label="Pause">⏸</button>
+        </div>
+        <div class="timebar"><i id="hud-timebar"></i></div>
+        <div class="boss-hud" id="boss-hud" hidden>
+          <span>🏪 BOSS</span>
+          <div class="boss-bar"><i id="boss-hp"></i></div>
+          <b id="boss-hp-text">100%</b>
+        </div>
+      </header>
+
+      <div class="stage" id="stage">
+        <div class="det-slot" id="det-slot"></div>
+        <div class="info-row">
+          <div class="presenter" id="presenter"></div>
+          <div class="loc-tag" id="loc-tag"></div>
+        </div>
+        <div class="item-zone">
+          <div class="item-slot" id="item-slot"></div>
+          <div class="queue" id="queue" aria-hidden="true"></div>
+        </div>
+        <div class="boss" id="boss" aria-hidden="true">
+          <div class="boss-body">
+            <div class="boss-awning"></div>
+            <div class="boss-sign">SUPERMARKT</div>
+            <div class="boss-eyes"><i></i><i></i></div>
+            <div class="boss-mouth"></div>
+          </div>
+          <div class="boss-say" id="boss-say"></div>
+        </div>
+        <div class="disrupt" id="disrupt" aria-hidden="true"></div>
+        <div class="bubbles" id="bubbles" aria-hidden="true"></div>
+        <div class="meme" id="meme" aria-live="polite"></div>
+        <div class="tut-hint" id="tut-hint" hidden></div>
+
+        <!-- Zutaten-Minispiel -->
+        <div class="ing" id="ing" hidden>
+          <div class="ing-card">
+            <div class="ing-head">
+              <div class="ing-pack" id="ing-pack"></div>
+              <div class="ing-titles">
+                <span class="ing-tag" id="ing-tag">ZUTATEN</span>
+                <h3 id="ing-title">Produkt</h3>
+                <small id="ing-sub">Tippe auf das Problem – oder entscheide unten.</small>
+              </div>
+            </div>
+            <div class="ing-timer"><i id="ing-bar"></i></div>
+            <div class="ing-window" id="ing-window"><ul class="ing-list" id="ing-list"></ul></div>
+            <div class="ing-foot">⬅ ✅ HALAL wenn alles passt · ❌ HARAM wenn ein Problem drin ist ➡</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="banner" id="banner" aria-live="polite"></div>
+      <div class="floaters" id="floaters" aria-hidden="true"></div>
+
+      <nav class="controls" id="controls" aria-label="Entscheidung">
+        <button class="dbtn halal" type="button" data-choice="halal" aria-label="Halal"><span class="ic">✅</span><span class="lb">HALAL</span><kbd>← A</kbd></button>
+        <button class="dbtn check" type="button" data-choice="check" aria-label="Ingredients checken"><span class="ic">🔎</span><span class="lb">INGREDIENTS</span><kbd>↓ S</kbd></button>
+        <button class="dbtn haram" type="button" data-choice="haram" aria-label="Haram"><span class="ic">❌</span><span class="lb">HARAM</span><kbd>→ D</kbd></button>
+      </nav>
+
+      <div class="pause" id="pause" hidden>
+        <div class="pause-card">
+          <h2>⏸ PAUSE</h2>
+          <p>Der Detector macht kurz Teepause.</p>
+          <button class="btn play" data-action="resume">▶ WEITER</button>
+          <button class="btn c-board" data-action="restart">↻ NEU STARTEN</button>
+          <button class="btn ghost" data-action="quit">⌂ HAUPTMENÜ</button>
+          <div class="pause-toggles">
+            <button class="toggle" data-action="toggle" data-key="music">🎵 Musik</button>
+            <button class="toggle" data-action="toggle" data-key="sfx">🔊 Sounds</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== GAME OVER ===================== -->
+    <section class="screen menu-screen" id="scr-over" aria-label="Game Over">
+      <h2 class="go-title">GAME OVER</h2>
+      <div class="go-rank-card">
+        <small>DEIN DETECTOR-RANG</small>
+        <b id="go-rank">–</b>
+        <span id="go-rank-sub"></span>
+      </div>
+      <div class="go-badges" id="go-badges"></div>
+      <div class="go-stats" id="go-stats"></div>
+      <p class="go-comment" id="go-comment"></p>
+      <p class="go-rewards" id="go-rewards"></p>
+      <div class="go-buttons">
+        <button class="btn play" data-action="again">↻ PLAY AGAIN</button>
+        <div class="menu-row">
+          <button class="btn c-duel" data-action="share">📣 TEILEN</button>
+          <button class="btn ghost" data-action="back">⌂ MENÜ</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SHOP ===================== -->
+    <section class="screen menu-screen" id="scr-shop" aria-label="Shop">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>🛒 SHOP</h2>
+        <span class="pill">🪙 <b id="shop-coins">0</b></span>
+      </header>
+      <p class="hint">Kosmetische Detector-Skins. Kein Pay-to-Win – nur Pay-to-Piep. Coins gibt’s für jede Runde.</p>
+      <div class="skin-list" id="shop-list"></div>
+    </section>
+
+    <!-- ===================== RANGLISTE ===================== -->
+    <section class="screen menu-screen" id="scr-board" aria-label="Rangliste">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>🏆 RANGLISTE</h2>
+        <span class="pill">LOKAL</span>
+      </header>
+      <div class="board-bests" id="board-bests"></div>
+      <div class="tabs" id="board-tabs"></div>
+      <ol class="board-list" id="board-list"></ol>
+      <p class="hint" id="board-stats"></p>
+      <p class="hint small">Nur Gameplay-Statistiken. Gespeichert auf diesem Gerät.</p>
+    </section>
+
+    <!-- ===================== EINSTELLUNGEN ===================== -->
+    <section class="screen menu-screen" id="scr-settings" aria-label="Einstellungen">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>⚙️ SETTINGS</h2>
+        <span></span>
+      </header>
+      <label class="field">
+        <span>Dein Name (Rangliste)</span>
+        <input id="set-name" type="text" maxlength="14" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>🔊 Lautstärke</span>
+        <input id="set-volume" type="range" min="0" max="100" step="1">
+      </label>
+      <div class="toggles">
+        <button class="toggle" data-action="toggle" data-key="music">🎵 Musik</button>
+        <button class="toggle" data-action="toggle" data-key="sfx">🔊 Soundeffekte</button>
+        <button class="toggle" data-action="toggle" data-key="swipe">👆 Swipe-Steuerung <small>links = HALAL · tippen = INGREDIENTS · rechts = HARAM</small></button>
+        <button class="toggle" data-action="toggle" data-key="reduceMotion">🐢 Reduzierte Animationen</button>
+        <button class="toggle" data-action="toggle" data-key="reduceFx">🕶️ Reduzierte Bildschirm-Effekte <small>kein Wackeln, kein Blitzen</small></button>
+        <button class="toggle" data-action="toggle" data-key="bigButtons">🔲 Größere Buttons</button>
+        <button class="toggle" data-action="toggle" data-key="patterns">🏁 Muster auf Buttons <small>zusätzlich zu Farbe, Symbol &amp; Position</small></button>
+      </div>
+      <div class="set-buttons">
+        <button class="btn c-board" data-action="tutorial">🎓 TUTORIAL WIEDERHOLEN</button>
+        <button class="btn c-set" data-action="help">❓ SO FUNKTIONIERT’S</button>
+        <button class="btn danger" data-action="reset">🗑️ FORTSCHRITT ZURÜCKSETZEN</button>
+      </div>
+      <p class="hint small" id="storage-note"></p>
+      <p class="hint small">Schriften: Lilita One &amp; Nunito (SIL Open Font License). Alle Sounds werden live im Browser erzeugt.</p>
+    </section>
+
+    <!-- ===================== HILFE ===================== -->
+    <section class="screen menu-screen" id="scr-help" aria-label="So funktioniert's">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>❓ SO GEHT’S</h2>
+        <span></span>
+      </header>
+      <div class="rule r-halal"><b>✅ HALAL</b><p>Obst, Gemüse, Wasser, Grundnahrungsmittel – oder das Produkt trägt sichtbar ein <em>„HALAL ✓“</em>-Siegel.</p></div>
+      <div class="rule r-haram"><b>❌ HARAM</b><p>Eindeutig Schwein (Speck, Schinken, Schmalz …) oder Alkohol als Getränk (Bier, Wein, Wodka …).</p></div>
+      <div class="rule r-check"><b>🔎 INGREDIENTS</b><p>Alles, was man am Bild nicht sicher erkennt: Süßigkeiten, Fertiggerichte, Soßen, Fleischgerichte ohne Siegel, Import-Snacks … <em>Nicht raten – checken!</em></p></div>
+      <div class="rule"><b>📜 Zutaten-Minispiel</b><p>Tippe auf das Problem (z. B. <em>Gelatine (Schwein)</em>, <em>Rum</em>) – oder entscheide ✅ HALAL, wenn alles passt. Harmlose Zutaten antippen kostet Zeit.</p></div>
+      <div class="rule"><b>⚡ Tempo</b><p>Jede Runde wird schneller. Richtige Serien bauen Combo &amp; Aura auf. Fehler kosten ❤️ – drei Fehler am Stück kosten richtig Aura. 💀</p></div>
+      <div class="rule"><b>⌨️ Steuerung</b><p>Buttons antippen · Tastatur: <kbd>←</kbd>/<kbd>A</kbd> HALAL · <kbd>↓</kbd>/<kbd>S</kbd>/<kbd>Leertaste</kbd> INGREDIENTS · <kbd>→</kbd>/<kbd>D</kbd> HARAM · <kbd>Esc</kbd> Pause. Optional: Swipe-Steuerung in den Settings.</p></div>
+      <div class="rule note"><b>ℹ️ Wichtig</b><p>Das Spiel ist Unterhaltung und <strong>kein religiöses Rechtsgutachten</strong>. Die Spiel-Logik bewertet nur die im Spiel angezeigten Angaben. Im echten Leben: echte Zutatenliste lesen und bei Unsicherheit fachkundige Stellen fragen.</p></div>
+    </section>
+
+    <!-- ===================== DUELL (2 SPIELER) ===================== -->
+    <section class="screen" id="scr-duel" aria-label="Duell">
+      <div class="duel-side p2">
+        <div class="duel-score"><b>PLAYER 2</b><span class="d-res" id="d2-res"></span><em id="d2-score">0</em></div>
+        <div class="duel-btns">
+          <button class="dbtn halal" type="button" data-p="2" data-choice="halal"><span class="ic">✅</span><span class="lb">HALAL</span><kbd>J</kbd></button>
+          <button class="dbtn check" type="button" data-p="2" data-choice="check"><span class="ic">🔎</span><span class="lb">CHECK</span><kbd>K</kbd></button>
+          <button class="dbtn haram" type="button" data-p="2" data-choice="haram"><span class="ic">❌</span><span class="lb">HARAM</span><kbd>L</kbd></button>
+        </div>
+      </div>
+      <div class="duel-mid">
+        <button class="icon-btn duel-quit" data-action="duel-quit" aria-label="Duell beenden">✕</button>
+        <div class="duel-round" id="duel-round">WHO HAS THE FASTER DETECTOR?</div>
+        <div class="duel-item" id="duel-item"></div>
+        <div class="duel-timer"><i id="duel-bar"></i></div>
+        <div class="duel-info" id="duel-info"></div>
+      </div>
+      <div class="duel-side p1">
+        <div class="duel-score"><b>PLAYER 1</b><span class="d-res" id="d1-res"></span><em id="d1-score">0</em></div>
+        <div class="duel-btns">
+          <button class="dbtn halal" type="button" data-p="1" data-choice="halal"><span class="ic">✅</span><span class="lb">HALAL</span><kbd>A</kbd></button>
+          <button class="dbtn check" type="button" data-p="1" data-choice="check"><span class="ic">🔎</span><span class="lb">CHECK</span><kbd>S</kbd></button>
+          <button class="dbtn haram" type="button" data-p="1" data-choice="haram"><span class="ic">❌</span><span class="lb">HARAM</span><kbd>D</kbd></button>
+        </div>
+      </div>
+      <div class="duel-results" id="duel-results" hidden>
+        <div class="duel-res-card">
+          <h2>⚔️ ERGEBNIS</h2>
+          <div id="duel-res-body"></div>
+          <button class="btn play" data-action="duel-again">↻ REVANCHE</button>
+          <button class="btn ghost" data-action="duel-quit">⌂ MENÜ</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <canvas id="fx-canvas" aria-hidden="true"></canvas>
+  <div id="flash" aria-hidden="true"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <noscript><div class="noscript">Bruder… JavaScript ist aus. Der Detector braucht JavaScript. 🔎</div></noscript>
+
+  <script src="js/util.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/duel.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
