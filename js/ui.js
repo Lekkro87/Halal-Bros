@@ -336,9 +336,11 @@
       if (!r) return;
       const text = 'HALAL HARAM DETECTOR 🔎\nScore: ' + U.fmt(r.score) + ' · Combo: ' + r.maxCombo + ' · Accuracy: ' + r.accuracy + '% · Aura: ' + U.fmtSigned(r.aura) +
         '\nRang: ' + r.rank[1] + '\n„BROTHER… CHECK THE INGREDIENTS.“';
-      if (navigator.share) {
+      let top = true;
+      try { top = window.self === window.top; } catch (e) { top = false; }
+      if (navigator.share && top) {
         navigator.share({ title: 'Halal Haram Detector', text, url: location.href.split('#')[0] }).catch(() => {});
-      } else if (navigator.clipboard) {
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => FX.toast('Ergebnis kopiert! 📋'), () => FX.toast(text, 4000));
       } else {
         FX.toast(text, 4000);
