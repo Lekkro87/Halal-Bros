@@ -32,14 +32,18 @@
     boards: {},
     stats: { games: 0, correct: 0, wrong: 0, checks: 0, bosses: 0, legendary: 0, maxCombo: 0 },
     // 2.0
-    pu: { xray: 1, slowmo: 1, dua: 1 },
+    pu: { xray: 1, slowmo: 1, dua: 1, freeze: 1, joker: 1 },
     seen: {},
     st2: {},
     ach: {},
     missions: { date: '', list: [] },
     bonusDate: '',
+    // 3.0
+    modeBests: {},
+    modesPlayed: {},
+    dailyCh: { date: '', best: 0, tries: 0 },
   });
-  const DYNAMIC = ['boards', 'seen', 'st2', 'ach'];
+  const DYNAMIC = ['boards', 'seen', 'st2', 'ach', 'modeBests', 'modesPlayed'];
 
   function merge(base, saved) {
     if (!saved || typeof saved !== 'object') return base;
@@ -102,7 +106,22 @@
       return { lvl, into: xp - acc, need };
     },
 
-    areaUnlocked(area) { return this.data.xp >= area.xp; },
+    areaUnlocked(area) { return !area.hidden && this.data.xp >= area.xp; },
+
+    /** Tages-Challenge: bester Wert des heutigen Tages (gibt true zurück, wenn neu) */
+    recordDaily(score) {
+      const c = this.data.dailyCh, today = HHD.U.today();
+      if (c.date !== today) { c.date = today; c.best = 0; c.tries = 0; }
+      c.tries++;
+      const isNew = score > c.best;
+      if (isNew) c.best = score;
+      this.save();
+      return isNew;
+    },
+    dailyToday() {
+      const c = this.data.dailyCh;
+      return c.date === HHD.U.today() ? c : { date: HHD.U.today(), best: 0, tries: 0 };
+    },
 
     /**
      * Speichert eine beendete Runde. Gibt zurück, welche Rekorde neu sind.
@@ -121,6 +140,8 @@
       const today = HHD.U.today();
       if (d.daily.date !== today) d.daily = { date: today, score: 0 };
       if (run.score > d.daily.score) { d.daily.score = run.score; news.daily = true; }
+      // Bestwert je Spielmodus
+      if (run.mode && run.score > (d.modeBests[run.mode] || 0)) { d.modeBests[run.mode] = run.score; news.modeBest = true; }
 
       // Ranglisten (Top 10 je Kategorie)
       const entry = { name: d.name, date: today, score: run.score, area: run.areaName };

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Erzeugt die Detector-Stimme („HALAL“ / „HARAM“) und schreibt js/voicedata.js.
+# Erzeugt die Detector-Stimme („HALAL“ / „HARAM“ + kurze Sätze) und schreibt js/voicedata.js.
 #
 # Benötigt (Linux): pico2wave (SVOX Pico), sox, lame
 #   sudo apt-get install libttspico-utils sox lame
@@ -41,6 +41,29 @@ out=js/voicedata.js
     done
     echo "    },"
   done
+  # Kurze Sätze des Detectors (Level, Boss, Zeitjagd, Chaos …)
+  echo "    line: {"
+  while IFS='|' read -r key text; do
+    pico2wave -l de-DE -w "$tmp/raw.wav" "<pitch level='96'>$text</pitch>"
+    sox "$tmp/raw.wav" -r 22050 -b 16 "$tmp/cut.wav" \
+      silence 1 0.005 -48d reverse silence 1 0.005 -48d reverse \
+      highpass 90 compand 0.005,0.12 6:-70,-60,-30,-18,-10,-8,0,-6 -4 -90 0.005 gain -n -1
+    sox "$tmp/cut.wav" "$tmp/fade.wav" fade q 0.004 -0 0.03
+    lame --quiet -m m -b 40 --noreplaygain "$tmp/fade.wav" "$tmp/voice.mp3"
+    echo "      $key: '$(base64 < "$tmp/voice.mp3" | tr -d '\n')',"
+  done <<'LINES'
+level|Neues Level!
+boss|Achtung, Boss!
+bossWin|Boss besiegt!
+over|Spiel vorbei.
+time|Die Zeit ist um!
+ten|Noch zehn Sekunden!
+mutator|Neue Störung!
+shift|Feierabend!
+win|Geschafft!
+power|Stromausfall!
+LINES
+  echo "    },"
   echo "  };"
   echo "})();"
 } > "$out"

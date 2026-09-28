@@ -39,6 +39,7 @@
 
       <nav class="menu">
         <button class="btn play" data-action="play">▶ PLAY</button>
+        <button class="daily-hint" id="st-daily-ch" data-action="daily" hidden>📅 TAGES-CHALLENGE: <b>heute noch offen!</b></button>
         <div class="menu-row">
           <button class="btn c-shop" data-action="shop">🛒 SHOP</button>
           <button class="btn c-board" data-action="leaderboard">🏆 LEADERBOARD</button>
@@ -58,6 +59,17 @@
       <p class="disclaimer">Unterhaltung – kein religiöses Rechtsgutachten. Im Spiel zählt nur, was im Spiel auf der Packung bzw. in der Zutatenliste steht.</p>
     </section>
 
+    <!-- ===================== SPIELMODI ===================== -->
+    <section class="screen menu-screen" id="scr-modes" aria-label="Spielmodi">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>🎮 SPIELMODI</h2>
+        <span class="pill" id="modes-count">10 MODI</span>
+      </header>
+      <p class="hint">Wie willst du heute scannen? Tippe auf einen Modus.</p>
+      <div class="mode-grid" id="mode-grid"></div>
+    </section>
+
     <!-- ===================== STADTKARTE ===================== -->
     <section class="screen menu-screen" id="scr-map" aria-label="Stadtkarte">
       <header class="scr-head">
@@ -65,7 +77,10 @@
         <h2>🗺️ STADTKARTE</h2>
         <span class="pill" id="map-xp">0 XP</span>
       </header>
-      <div class="modes" id="map-modes" role="group" aria-label="Spielmodus"></div>
+      <div class="map-mode">
+        <span class="map-mode-pill" id="map-mode-pill">🔎 NORMAL</span>
+        <button class="btn small ghost" data-action="modes">🎮 MODUS ÄNDERN</button>
+      </div>
       <p class="mode-desc" id="map-mode-desc"></p>
       <p class="hint">XP aus jeder Runde schalten neue Stadtbereiche frei. Höhere Bereiche starten schneller – und geben mehr Punkte.</p>
       <div class="area-list" id="map-list"></div>
@@ -102,6 +117,7 @@
         <div class="item-zone">
           <div class="item-slot" id="item-slot"></div>
           <div class="queue" id="queue" aria-hidden="true"></div>
+          <div class="darkness" aria-hidden="true"></div>
         </div>
         <div class="boss" id="boss" aria-hidden="true">
           <div class="boss-body">
@@ -110,10 +126,10 @@
             <div class="boss-eyes"><i></i><i></i></div>
             <div class="boss-mouth"></div>
           </div>
-          <div class="terlik-body">
-            <span class="tb-emo">🩴</span>
+          <div class="eboss-body">
+            <span class="eb-emo">🩴</span>
             <div class="boss-eyes"><i></i><i></i></div>
-            <span class="tb-tag">MAMAS TERLIK</span>
+            <span class="eb-tag">MAMAS TERLIK</span>
           </div>
           <div class="boss-say" id="boss-say"></div>
         </div>
@@ -177,7 +193,7 @@
 
     <!-- ===================== GAME OVER ===================== -->
     <section class="screen menu-screen" id="scr-over" aria-label="Game Over">
-      <h2 class="go-title">GAME OVER</h2>
+      <h2 class="go-title" id="go-title">GAME OVER</h2>
       <div class="go-rank-card">
         <small>DEIN DETECTOR-RANG</small>
         <b id="go-rank">–</b>
@@ -186,6 +202,7 @@
       <div class="go-badges" id="go-badges"></div>
       <div class="go-stats" id="go-stats"></div>
       <p class="go-comment" id="go-comment"></p>
+      <p class="go-review" id="go-review" hidden></p>
       <p class="go-rewards" id="go-rewards"></p>
       <div class="go-buttons">
         <button class="btn play" data-action="again">↻ PLAY AGAIN</button>
@@ -251,6 +268,8 @@
         <span class="pill">LOKAL</span>
       </header>
       <div class="board-bests" id="board-bests"></div>
+      <h3 class="board-sub">🎮 BESTWERTE JE MODUS</h3>
+      <div class="board-modes" id="board-modes"></div>
       <div class="tabs" id="board-tabs"></div>
       <ol class="board-list" id="board-list"></ol>
       <p class="hint" id="board-stats"></p>
@@ -315,9 +334,11 @@
       <div class="rule"><b>🌙 Iftar Rush</b><p>8 Iftar-Gerichte in Rekordzeit, alles zählt doppelt. Ohne Fehler gibt’s ein Power-up. Achtung: Auch aufs Buffet schummelt sich mal ein Rakı.</p></div>
       <div class="rule"><b>📞 Mama ruft an</b><p>✅ = annehmen (+Aura) · ❌ = wegdrücken … dann fliegt der Terlik. 🩴 Drei Fehler hintereinander übrigens auch.</p></div>
       <div class="rule"><b>🚨 Halal-Polizei</b><p>Die selbsternannte Halal-Polizei ruft bei allem „HARAM!“ – auch bei Bananen. Nicht nachplappern, selbst prüfen.</p></div>
-      <div class="rule"><b>⚡ Power-ups</b><p>🔍 Röntgen-Blick zeigt die Antwort · ⏳ Zeitlupe gibt mehr Zeit · 🤲 Mamas Dua fängt einen Fehler ab. Antippen oder Tasten <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>.</p></div>
+      <div class="rule"><b>⚡ Power-ups</b><p>🔍 Röntgen-Blick zeigt die Antwort · ⏳ Zeitlupe gibt mehr Zeit · 🤲 Mamas Dua fängt einen Fehler ab · ❄️ Eiszeit hält die Zeit an · ⏭️ Joker überspringt ein Produkt. Antippen oder Tasten <kbd>1</kbd>–<kbd>5</kbd>.</p></div>
+      <div class="rule"><b>🆕 Neue Modi</b><p>📅 <em>Tages-Challenge</em>: 30 Produkte, heute für alle gleich · ⏱️ <em>Zeitjagd</em>: 60 Sekunden, richtig +0,5 s, Check +1,5 s, Fehler −3 s · 🌀 <em>Chaos</em>: alle 6 Produkte eine neue Störung (Spiegel-Tasten, Nebel, Stromausfall, Lügen-Anzeige …) · 📜 <em>Zutaten-Profi</em>: nur Zutatenlisten · 👑 <em>Boss-Marathon</em>: 5 Bosse am Stück · 🏪 <em>Kiosk-Schicht</em>: 25 Kunden, 5 Sterne, Trinkgeld.</p></div>
+      <div class="rule"><b>🎲 Überraschungen</b><p>🔦 Stromausfall (nur die Taschenlampe leuchtet) · ⚡ Blitzangebot (5 Produkte zählen doppelt) · 🚗 Hochzeitskorso · 🐈 Kiosk-Katze · 📱 Sprachnachrichten vom Onkel.</p></div>
       <div class="rule"><b>🗣️ Detector-Stimme</b><p>Nach jeder Entscheidung sagt der Detector laut, was das Produkt wirklich ist: <em>„HALAL“</em> oder <em>„HARAM“</em>. Bei Zutaten-Produkten erst, wenn die Zutaten aufgedeckt sind. Abschaltbar in den Settings.</p></div>
-      <div class="rule"><b>👹 Bosse</b><p>Nach Level 3: <em>Der Supermarkt</em>. Nach Level 6: <em>Mamas Terlik</em>. In Level 7 kommen sie immer wieder.</p></div>
+      <div class="rule"><b>👹 Bosse</b><p>Nach Level 3: <em>Der Supermarkt</em>. Nach Level 6: <em>Mamas Terlik</em>. In Level 7 kommen alle fünf immer wieder – auch <em>der Snack-Automat</em>, <em>die Tante</em> („Wann heiratest du?“) und <em>die Hochzeit</em> (500 Gäste). Im Boss-Marathon alle am Stück.</p></div>
       <div class="rule"><b>⌨️ Steuerung</b><p>Buttons antippen · Tastatur: <kbd>←</kbd>/<kbd>A</kbd> HALAL · <kbd>↓</kbd>/<kbd>S</kbd>/<kbd>Leertaste</kbd> INGREDIENTS · <kbd>→</kbd>/<kbd>D</kbd> HARAM · <kbd>Esc</kbd> Pause. Optional: Swipe-Steuerung in den Settings.</p></div>
       <div class="rule note"><b>ℹ️ Wichtig</b><p>Das Spiel ist Unterhaltung und <strong>kein religiöses Rechtsgutachten</strong>. Die Spiel-Logik bewertet nur die im Spiel angezeigten Angaben. Im echten Leben: echte Zutatenliste lesen und bei Unsicherheit fachkundige Stellen fragen.</p></div>
     </section>
@@ -368,6 +389,7 @@
   <script src="js/util.js"></script>
   <script src="js/data.js"></script>
   <script src="js/data2.js"></script>
+  <script src="js/data3.js"></script>
   <script src="js/store.js"></script>
   <script src="js/voicedata.js"></script>
   <script src="js/audio.js"></script>

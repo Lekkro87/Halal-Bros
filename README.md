@@ -8,7 +8,7 @@ Ein absurd schnelles, chaotisches Meme-Reaktionsspiel für Handy und Browser. Du
 |---|---|---|
 | Obst, Gemüse, Wasser, Grundnahrungsmittel oder sichtbares „HALAL ✓“-Siegel | Alles Unklare: Gummibärchen, Soßen, Fertiggerichte, Fleisch ohne Siegel … | Eindeutig Schwein oder Alkohol als Getränk |
 
-**Einfach zu verstehen. Schwer zu meistern. Komplett chaotisch.** Und seit **Version 2.0** mit Ramadan-Modus, Iftar Rush, Mama am Telefon und einem fliegenden Terlik.
+**Einfach zu verstehen. Schwer zu meistern. Komplett chaotisch.** Seit **Version 2.0** mit Ramadan-Modus, Iftar Rush, Mama am Telefon und einem fliegenden Terlik. Seit **Version 3.0** mit **10 Spielmodi**, fünf Bossen und 183 Produkten.
 
 ![Screenshots: Startbildschirm, Döner-Meister, Zutaten-Minispiel, Boss „Der Supermarkt“](docs/preview.png)
 
@@ -32,30 +32,78 @@ Keine Installation, keine Abhängigkeiten, kein Build-Schritt:
 | INGREDIENTS | 🟡 mittlerer Button | `↓`, `S` oder `Leertaste` |
 | HARAM | 🔴 rechter Button | `→` oder `D` |
 | Problem-Zutat melden | Zutat in der Liste antippen | – |
-| Power-ups (Röntgen · Zeitlupe · Dua) | 🔍 ⏳ 🤲 am linken Rand | `1` `2` `3` |
+| Power-ups (Röntgen · Zeitlupe · Dua · Eiszeit · Joker) | 🔍 ⏳ 🤲 ❄️ ⏭️ am linken Rand | `1` bis `5` |
 | Mama-Anruf annehmen / wegdrücken | 📞 grüner / 📵 roter Button | wie HALAL / HARAM |
 | Pause | ⏸ | `Esc` / `P` |
 
 Optional in den Settings: **Swipe-Steuerung** (links = HALAL, tippen = INGREDIENTS, rechts = HARAM).
+Die Tasten wirken nach **Position** (links, Mitte, rechts): Vertauscht der Chaos-Modus die Buttons, wandern die Tasten mit.
 **Duell (2 Spieler, ein Gerät):** Spieler 1 `A` `S` `D`, Spieler 2 `J` `K` `L` (oder Pfeiltasten). Auf dem Handy sitzen beide gegenüber.
 
 ## 🎮 Features
 
 - **Kern-Loop:** Produkt erscheint → Detector piept und scannt (`BEEP` → `SCANNING...` → `???`) → du entscheidest gegen die Uhr → sofortiges Feedback → nächstes Produkt, immer schneller.
 - **Zutaten-Minispiel:** Verpackung zoomt heran, die Zutatenliste scrollt vorbei. Problem-Zutat antippen (z. B. *Gelatine (Schwein)*, *Rum*) oder HALAL/HARAM entscheiden. Später werden die Listen länger und das Problem versteckt sich weiter unten. Fallen wie *Zuckeralkohol* (ist kein Alkohol) oder *Cocktailsoße (ohne Alkohol)* inklusive.
-- **135 Produkte + Legendary Items** mit Lookalikes: `HALAL CHICKEN` direkt neben `BACON FLAVOR`, `HALLO` statt `HALAL`, Cola vs. Dosenbier in derselben Dose, Falafel vs. Frikadelle, Weingummi, Schweineohr (das Gebäck!), Leberkäse …
+- **183 Produkte + 5 Legendary Items** mit Lookalikes: `HALAL CHICKEN` direkt neben `BACON FLAVOR`, `HALLO` statt `HALAL`, Cola vs. Dosenbier in derselben Dose, Falafel vs. Frikadelle, Weingummi, Schweineohr (das Gebäck!), Leberkäse …
 - **7 Level, 7 Stadtbereiche:** Straße → Dönerladen → Supermarkt → Einkaufszentrum → Flughafen → Nachtmarkt → Mega Food City. Ab Level 4 mehrere Produkte gleichzeitig („NEXT“-Warteschlange), ab Level 5 unter einer Sekunde, Level 7 = *DETECTOR APOCALYPSE* (NPCs reden durcheinander, Pakete fliegen durchs Bild, der Detector überhitzt).
 - **Boss „DER SUPERMARKT“:** Der Supermarkt wird zum Gegner, Produkte fliegen von links und rechts herein. Richtig −10 % Boss-HP, falsch +5 %. Danach: `SUPERMARKET CLEARED` → `HALAL DETECTOR LEVEL UP`.
 - **Combo & Aura:** `HALAL STREAK 🔥` (5) … `BROTHER HAS ASCENDED` (20) … `DETECTOR OVERCLOCKED` (50) … `CITY SCAN ACTIVATED` (75) … bei **100** zoomt die Kamera heraus und der Detector scannt die ganze Stadt: *„BROTHER HAS BECOME THE DETECTOR.“* Aura gibt’s für schnelle Scans, gefundene Zutaten und perfekte Level. Abzug gibt’s für Raten, Zögern und 3 Fehler in Folge (`-900 AURA 💀`).
 - **Seltene Events:** Mystery Box, Grandma Mode („ICH HABE DAS SELBST GEMACHT.“), Ingredients in Arabic (mit Übersetzung), „BROTHER TRUST ME“ (Trust Level: 0 %), **Döner mit 17 Soßen** (`SYSTEM OVERLOAD`), Tauben-Diebstahl und ein sehr unnötiges Detector-Update.
 - **Zufällige Störungen:** Busse, Passanten, Verkäufer-Hände, umgedrehte oder nur halb sichtbare Verpackungen.
 - **Tutorial** mit dem Döner-Meister („WHAT IS THIS?“ → „NOW DON’T GUESS.“ → „WHEN YOU DON’T KNOW, CHECK.“).
-- **Shop mit 12 Detector-Skins und Power-ups:** Default, Gold (5000), Neon (Cyber), Döner Edition, Banana Edition, Grandma Edition (Teppichklopfer), das Ultra Rare *THE FORBIDDEN SCANNER* (nur durch Combo 75) und die fünf neuen Skins aus 2.0.
+- **Shop mit 16 Detector-Skins und 5 Power-ups:** Default, Gold (5000), Neon (Cyber), Döner Edition, Banana Edition, Grandma Edition (Teppichklopfer), das Ultra Rare *THE FORBIDDEN SCANNER* (nur durch Combo 75) und die neuen Skins aus 2.0 und 3.0.
 - **Progression:** XP schalten Stadtbereiche frei, Coins kaufen Skins, lokale Ranglisten (Score, Combo, schnellste Reaktion, meiste richtige Entscheidungen, Aura, schnellster Zutaten-Check), persönliche Bestleistung und Tagesrekord.
 - **🗣️ Detector-Stimme:** Nach jeder Entscheidung sagt der Detector laut, was das Produkt wirklich ist: **„HALAL“** oder **„HARAM“**. Bei Zutaten-Produkten sagt er es erst, wenn die Zutaten aufgedeckt sind; wer nie nachschaut, erfährt es auch nicht. Es gibt drei Tonlagen: normal, dramatisch mit Hall bei Fehlern und Hype ab Combo 10. In Level 7 stottert der überhitzte Detector („HA-HA-HALAL“), und jeder Skin klingt etwas anders. Während er spricht, wird die Musik leiser. Die Stimme läuft auch im Tutorial und im Duell und lässt sich in den Settings und im Pause-Menü abschalten.
 - **Sound & Musik komplett synthetisiert** (Web Audio, bis auf die Stimme keine Audiodateien): Scanner-Beeps, Fehler-Sounds, Bass-Meme-Boom, Crowd-Reaktionen, Döner-Grill und Supermarkt-Durchsagen. Der Beat wird mit Level und Combo schneller, im Bossfight dramatisch und in den letzten Millisekunden hektisch.
 - **Barrierefreiheit:** reduzierte Animationen (respektiert auch die System-Einstellung), reduzierte Bildschirm-Effekte, größere Buttons, Lautstärke, Musik/Sounds getrennt schaltbar, zusätzliche Muster auf den Buttons. Farbe ist nie das einzige Signal (Symbol + Text + feste Position).
 - **Performance:** Vanilla JS ohne Framework. Die Stadt wird auf einem Canvas mit vorgerenderten Sprites gezeichnet (unter 1 ms pro Frame), Partikel und Produkt-Elemente werden aus Pools wiederverwendet. Mobile-first.
+
+## 🎮 Neu in Version 3.0 – „Mehr von allem“
+
+![Screenshots 3.0: Modus-Auswahl, Boss „Die Hochzeit“, Chaos mit Stromausfall und Spiegel-Tasten, Kiosk-Schicht](docs/preview-3.png)
+
+- **Neue Modus-Auswahl** mit 10 Modi, Bestwert je Modus und „NEU“-Markierung. Modi mit 🗺️ starten über die Stadtkarte, die anderen sofort.
+  - 📅 **Tages-Challenge:** 30 Produkte, die heute für alle genau gleich sind (fester Zufall aus dem Datum). Jeden Tag neu, mit eigenem Tagesbestwert.
+  - ⏱️ **Zeitjagd:** 60 Sekunden auf der Uhr, die mit jedem Level schneller läuft. Richtig gibt +0,5 s, ein Zutaten-Check +1,5 s, ein Fehler kostet −3 s. Bei 10 Sekunden warnt der Detector.
+  - 🌀 **Chaos:** Alle 6 Produkte kommt eine neue Störung, und der Schauplatz wechselt mit. Es gibt 13 Störungen:
+    - 🪞 Spiegel (HALAL und HARAM tauschen die Plätze)
+    - 🔀 Mischmasch (die Tasten mischen sich bei jedem Produkt)
+    - 🌫️ Nebel, 🔬 Mini, 🎠 Karussell, 🙃 Kopfstand
+    - 🙈 ohne Namen, 📝 nur Text
+    - ⚡ Turbo, 🐌 Gemütlich, 💰 Doppelt
+    - 🔦 Stromausfall
+    - 🤥 Lügen-Anzeige: das Display rät, die Stimme bleibt ehrlich
+  - 📜 **Zutaten-Profi:** nur Zutatenlisten, die sofort aufgehen und immer länger werden.
+  - 👑 **Boss-Marathon:** alle 5 Bosse am Stück, jeder in seiner eigenen Kulisse. Wer alle schafft, schaltet die *Hochzeits Edition* frei.
+  - 🏪 **Kiosk-Schicht:** 25 Kunden fragen „Ist das halal?“. Du hast 5 Sterne Bewertung, schnelle Antworten bringen Trinkgeld, und am Ende gibt es eine Kundenbewertung. Mit 5 Sternen wird die *Kiosk Edition* freigeschaltet.
+- **Drei neue Bosse:**
+  - 🎰 **Der Snack-Automat:** „KEIN WECHSELGELD!“
+  - 🧕🏻 **Die Tante:** „WANN HEIRATEST DU?“
+  - 🎂 **Die Hochzeit:** „500 GÄSTE. 1 DETECTOR.“, im eigenen Hochzeitssaal mit Buffet und DJ Habibi
+
+  In Level 7 kommen jetzt alle fünf Bosse abwechselnd.
+- **48 neue Produkte**, darunter:
+  - Doppelgänger wie Glühwein vs. Kinderpunsch, Mojito vs. Virgin Mojito, Kräuterlikör vs. Kräutertee und Döner vs. Gyros
+  - Schokoküsse, Wackelpudding, Marzipan, Vitamin-Gummis, Maultaschen, Kaiserschmarrn, Hochzeitstorte, Mettbrötchen und Weißwurst
+  - Eiswürfel („Der Detector ist beleidigt“) und Salz
+  - zwei neue Legendary Items: Goldenes Simit und Platin-Ayran
+  - neue Orte: Weihnachtsmarkt, Hochzeit und Späti
+- **Neue Figuren:** Opa, kleine Schwester, Cousin („Ich hab da einen Guy“), Hochzeitsgast, Student und der Kiosk-Chef.
+- **Neue Überraschungen:**
+  - 🔦 Stromausfall (nur die Taschenlampe leuchtet)
+  - ⚡ Blitzangebot (5 Produkte zählen doppelt)
+  - 🚗 Hochzeitskorso (düt düt düüüt)
+  - 🐈 die Kiosk-Katze setzt sich vors Produkt
+  - 📱 Sprachnachrichten vom Onkel
+- **Neue Power-ups:** ❄️ *Eiszeit* hält die Zeit an. ⏭️ *Joker* überspringt ein Produkt ohne Strafe, die Combo bleibt.
+- **Der Detector spricht mehr:** „Neues Level!“, „Achtung, Boss!“, „Boss besiegt!“, „Neue Störung!“, „Noch zehn Sekunden!“, „Feierabend!“ und „Geschafft!“. Die Sätze warten, bis ein laufendes „HALAL“/„HARAM“ fertig ist.
+- **Mehr Fortschritt:**
+  - 32 Erfolge (unter anderem *Uhrmacher*, *Chaos-Bändiger*, *Tanten-Diplomat*, *Allrounder* für alle 10 Modi)
+  - 22 Tagesaufgaben im Pool
+  - neue Ränge bis *Legende vom Kiosk*
+  - Ranglisten-Bereich „Bestwerte je Modus“
+  - vier neue Skins: Simit, Pixel (8-Bit), Kiosk, Hochzeit
+- Mehr Sprüche für alle Situationen und neue Sounds: Ladenklingel, Kasse, Hupkonzert, Davul & Zurna und Automaten-Klonk.
 
 ## 🌙 Neu in Version 2.0
 
@@ -76,8 +124,8 @@ Optional in den Settings: **Swipe-Steuerung** (links = HALAL, tippen = INGREDIEN
 - **Neue Combo-Stufen**: `MASHALLAH! 🌙` (15), `YALLAH YALLAH YALLAH` (25), `SULTAN DES SCANNENS 👑` (40), `SUBHANALLAH` (60) … bis 100.
 - **Meta-Fortschritt**:
   - 📅 **3 Tagesaufgaben** (jeden Tag neu, gleich für alle)
-  - 🏅 **20 Erfolge** (von *BISMILLAH* bis *THE DETECTOR SEES EVERYTHING*)
-  - 📖 **Lexikon** mit allen 142 Einträgen und Erklärungen
+  - 🏅 **Erfolge** (von *BISMILLAH* bis *THE DETECTOR SEES EVERYTHING*)
+  - 📖 **Lexikon** mit allen Produkten (seit 3.0: 192 Einträge) und Erklärungen
   - ⭐ **Ränge** von *MINI-AKHI* über *HABIBI* und *DÖNER-PASCHA* bis *DETECTOR-SULTAN*
   - 🎁 täglicher **Harçlık vom Onkel** (+50 🪙)
 - **5 neue Detector-Skins**: Dattel Edition, Ramadan Edition (Hilal Scanner), Çay Edition (Çay-o-Mat 3000), Terlik Edition und die Sultan Edition (nur durch Eid).
@@ -95,14 +143,15 @@ Das Spiel ist **Unterhaltung und kein religiöses Rechtsgutachten.** Der Humor r
 ## 🗂️ Projektstruktur
 
 ```
-index.html            Alle Screens (Start, Stadtkarte, Spiel, Game Over, Shop, Lexikon, Aufgaben, Rangliste, Settings, Hilfe, Duell)
+index.html            Alle Screens (Start, Spielmodi, Stadtkarte, Spiel, Game Over, Shop, Lexikon, Aufgaben, Rangliste, Settings, Hilfe, Duell)
 css/style.css         Cartoon-/Cel-Shading-Look, Verpackungs-Art, Detector-Skins, Animationen
 js/util.js            Kleine Helfer
 js/data.js            Spielinhalte: Produkte, Zutaten-Varianten, Level, Bereiche, NPCs, Sprüche, Skins
 js/data2.js           Inhalte 2.0: Iftar-Gerichte, Familie, Halal-Polizei, Modi, Power-ups, Aufgaben, Erfolge, Ränge
+js/data3.js           Inhalte 3.0: 6 neue Modi, Chaos-Störungen, Boss-Registry, 48 Produkte, Figuren, Events, Skins
 js/meta.js            Tagesaufgaben, Erfolge, Lexikon, Ränge, Tagesbonus
 js/store.js           Lokale Speicherung (localStorage): Fortschritt, Rekorde, Ranglisten, Settings
-js/voicedata.js       Detector-Stimme „HALAL“ / „HARAM“ (6 kleine MP3s, eingebettet – erzeugt mit tools/make-voice.sh)
+js/voicedata.js       Detector-Stimme: „HALAL“ / „HARAM“ in 3 Tonlagen + 10 kurze Sätze (kleine MP3s, eingebettet – erzeugt mit tools/make-voice.sh)
 js/audio.js           Synthetisierte Soundeffekte, Musik-Sequencer, Ambience, Detector-Stimme
 js/art.js             Produkt-, Detector- und NPC-Markup
 js/world.js           Lebendige Stadt im Hintergrund (Canvas): Läden, Passanten, Busse, Stadtscan, Ramadan-Nacht

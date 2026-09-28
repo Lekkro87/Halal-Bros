@@ -54,7 +54,7 @@
   }
 
   /* ---------------- Detector-Stimme („HALAL“ / „HARAM“) ---------------- */
-  const voice = { bufs: {}, srcs: [], out: null, loading: false, echo: null };
+  const voice = { bufs: {}, srcs: [], out: null, loading: false, echo: null, busy: 0 };
 
   /** Eingebettete MP3s (js/voicedata.js) einmalig dekodieren */
   function loadVoice() {
@@ -118,7 +118,31 @@
     let start = t;
     if (o.glitch) { part(t, 0.1); part(t + 0.11, 0.1); start = t + 0.22; }
     part(start);
+    voice.busy = start + buf.duration / rate;
     duck(t, start - t + buf.duration / rate);
+    return true;
+  }
+
+  /** Kurzer Satz des Detectors – wartet, bis eine laufende Ansage fertig ist */
+  function sayLine(key, o) {
+    o = o || {};
+    if (!ctx || !settings.voice || ctx.state !== 'running') return false;
+    const buf = voice.bufs['line_' + key];
+    if (!buf) return false;
+    const now = ctx.currentTime;
+    const t = Math.max(now + (o.delay || 0), voice.busy + 0.05);
+    if (t - now > 1.2) return false; // zu spät – dann lieber gar nicht
+    const out = ctx.createGain();
+    out.gain.value = 0.9;
+    out.connect(voiceBus);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(out);
+    src.start(t);
+    voice.srcs.push(src);
+    voice.out = out;
+    voice.busy = t + buf.duration;
+    duck(t, buf.duration);
     return true;
   }
 
@@ -351,6 +375,79 @@
       tone(2637, 0.25, { at: t, type: 'sine', vol: 0.05 });
       tone(3520, 0.18, { at: t + 0.07, type: 'sine', vol: 0.035 });
     },
+    // ---- 3.0 ----
+    bell() { // Ladenklingel „ding-dong“
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(1319, 0.5, { at: t, type: 'sine', vol: 0.05 });
+      tone(1047, 0.7, { at: t + 0.22, type: 'sine', vol: 0.05 });
+    },
+    kaching() { // Kasse / Trinkgeld
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      noise(0.05, { at: t, ft: 'highpass', f: 3000, vol: 0.1 });
+      tone(2093, 0.1, { at: t + 0.03, type: 'square', vol: 0.04, lp: 6000 });
+      tone(2637, 0.32, { at: t + 0.1, type: 'triangle', vol: 0.06 });
+    },
+    meow() { // Kiosk-Katze (sehr stilisiert)
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(620, 0.3, { at: t, type: 'sawtooth', to: 900, slide: 0.12, vol: 0.045, lp: 2400, vib: 7, vibDepth: 20 });
+      tone(900, 0.22, { at: t + 0.14, type: 'sawtooth', to: 520, vol: 0.035, lp: 2000 });
+    },
+    honk() { // Hochzeitskorso: düt düt düüüt
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [[0, 0.12], [0.17, 0.12], [0.34, 0.42]].forEach(([d, l]) => {
+        tone(392, l, { at: t + d, type: 'sawtooth', vol: 0.045, lp: 1600 });
+        tone(494, l, { at: t + d, type: 'sawtooth', vol: 0.035, lp: 1600 });
+      });
+    },
+    powerdown() { // Stromausfall
+      tone(880, 0.7, { type: 'sawtooth', to: 40, slide: 0.65, vol: 0.07, lp: 1800 });
+      noise(0.25, { ft: 'lowpass', f: 400, vol: 0.1 });
+    },
+    mutate() { // neue Chaos-Störung
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      for (let i = 0; i < 5; i++) tone(300 + Math.random() * 1400, 0.07, { at: t + i * 0.06, type: 'square', vol: 0.045, lp: 3500 });
+      tone(200, 0.45, { at: t + 0.3, type: 'sawtooth', to: 800, vol: 0.045, lp: 2000, vib: 12, vibDepth: 40 });
+    },
+    vending() { // Snack-Automat: Münze + Klonk
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(3136, 0.06, { at: t, type: 'triangle', vol: 0.05 });
+      tone(2637, 0.06, { at: t + 0.07, type: 'triangle', vol: 0.05 });
+      noise(0.12, { at: t + 0.25, ft: 'lowpass', f: 300, vol: 0.22 });
+      tone(110, 0.15, { at: t + 0.25, type: 'sine', to: 60, vol: 0.18 });
+    },
+    wedding() { // Davul & Zurna, ganz kurz
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [0, 0.18, 0.27, 0.45].forEach((d, i) => {
+        tone(70, 0.18, { at: t + d, type: 'sine', to: 45, vol: 0.26 });
+        if (i % 2) noise(0.06, { at: t + d, ft: 'highpass', f: 2500, vol: 0.07 });
+      });
+      [69, 70, 73, 74, 76, 77, 76, 74].forEach((m, i) => tone(midi(m), 0.11, { at: t + i * 0.09, type: 'sawtooth', vol: 0.04, lp: 2600, vib: 6, vibDepth: 9 }));
+    },
+    starLose() { tone(660, 0.25, { type: 'triangle', to: 220, vol: 0.08 }); },
+    timeUp() { // Zeitjagd vorbei
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [0, 0.12, 0.24].forEach((d) => tone(880, 0.09, { at: t + d, type: 'square', vol: 0.06, lp: 3000 }));
+      tone(440, 0.9, { at: t + 0.36, type: 'square', vol: 0.08, lp: 2200 });
+    },
+    win() { // Modus geschafft
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [60, 64, 67, 72, 76, 79, 84].forEach((m, i) => tone(midi(m), i === 6 ? 0.9 : 0.14, { at: t + i * 0.08, type: i % 2 ? 'square' : 'triangle', vol: 0.07, lp: 5000 }));
+    },
+    notify() { // Handy-Benachrichtigung
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(1568, 0.08, { at: t, type: 'sine', vol: 0.06 });
+      tone(2093, 0.14, { at: t + 0.1, type: 'sine', vol: 0.06 });
+    },
   };
 
   /* ---------------- Musik-Sequencer ---------------- */
@@ -554,6 +651,9 @@
     /** Detector-Stimme: gibt true zurück, wenn wirklich gesprochen wird */
     say(word, o) {
       try { return say(word, o); } catch (e) { return false; }
+    },
+    sayLine(key, o) {
+      try { return sayLine(key, o); } catch (e) { return false; }
     },
     voiceReady() { return Object.keys(voice.bufs).length; },
     setSkinPitch(p) { pitchMul = p || 1; },

@@ -19,7 +19,11 @@
     'TELEFONLADEN': '📱', 'FOOD COURT': '🍔', 'RESTAURANT': '🍝', 'SUSHI BAR': '🍣', 'SUSHI XXL': '🍣', 'BURGER': '🍔',
     'GATE A12': '✈️', 'DUTY FREE': '🛍️', 'LOUNGE': '🛋️', 'NACHTMARKT': '🏮', 'STREET FOOD': '🍢', 'GRILL': '🍗', 'NUDELN': '🍜',
     'HYPERMARKT': '🛒',
+    // 3.0
+    'SPÄTI': '🥤', 'LOTTO': '🍀', 'HOCHZEITSSAAL': '💒', 'BUFFET': '🍽️', 'DJ HABIBI': '🎧', 'TORTE': '🎂', 'FOTOBOX': '📸',
+    'GLÜHWEIN': '🍷', 'MARONEN': '🌰', 'BRATWURST': '🌭', 'KINDERPUNSCH': '🍵', 'LEBKUCHEN': '🍪',
   };
+  const STALLS = ['MARKT', 'NACHTMARKT', 'STREET FOOD', 'GLÜHWEIN', 'MARONEN', 'BRATWURST', 'KINDERPUNSCH', 'LEBKUCHEN'];
 
   const W = {
     cv: null, g: null, w: 0, h: 0, dpr: 1, t: 0, x: 0,
@@ -85,7 +89,7 @@
           let kind = 'shop';
           if (n === 'PARK') kind = 'park';
           else if (n === 'TANKSTELLE') kind = 'tank';
-          else if (n === 'MARKT' || n === 'NACHTMARKT' || n === 'STREET FOOD') kind = 'stall';
+          else if (STALLS.includes(n)) kind = 'stall';
           else if (n === 'FOOD TRUCK') kind = 'truck';
           this.sprites.push(this.makeShop(n, kind, shopH * U.rand(0.9, 1.15)));
         }
