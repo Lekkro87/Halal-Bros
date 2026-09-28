@@ -1,6 +1,8 @@
 /* Halal Haram Detector – Gameplay-Kern
  * Ablauf: Produkt erscheint → Detector scannt → Spieler entscheidet (HALAL / INGREDIENTS / HARAM)
  * → Feedback → nächstes Produkt, immer schneller.
+ * 2.0: Modi (Normal, Ramadan, Hardcore, Üben), Iftar Rush, Mama-Anruf, Halal-Polizei,
+ *      Terlik-Wurf, Boss „Mamas Terlik“, Endlos-Bosse, Power-ups, Missionen & Erfolge.
  */
 (function () {
   'use strict';
@@ -11,9 +13,11 @@
   const FX = HHD.FX;
   const Art = HHD.Art;
   const W = HHD.World;
+  const Meta = HHD.Meta;
 
   const ENTER = 0.18; // Flug-Animation des Produkts (in der Entscheidungszeit enthalten)
   const CHOICE_LABEL = { halal: '✅ HALAL', haram: '❌ HARAM', check: '🔎 INGREDIENTS' };
+  const RAMADAN_PLACES = ['iftar', 'basar', 'zuhause'];
 
   const G = {
     el: {},
@@ -21,10 +25,10 @@
     run: null,
     cur: null,
     chk: null,
+    call: null,
     timers: [],
     gameTime: 0,
     paused: false,
-    lastTick: 0,
     tutorial: null,
 
     init() {
@@ -33,7 +37,8 @@
       ['stage', 'det-slot', 'item-slot', 'queue', 'loc-tag', 'presenter', 'meme', 'disrupt', 'bubbles', 'floaters', 'banner',
         'ing', 'ing-pack', 'ing-title', 'ing-sub', 'ing-bar', 'ing-window', 'ing-list', 'ing-tag', 'controls',
         'hud-score', 'hud-combo', 'hud-mult', 'hud-aura', 'hud-time', 'hud-timebar', 'hud-lives', 'hud-level',
-        'boss-hud', 'boss-hp', 'boss-hp-text', 'boss', 'boss-say', 'pause', 'tut-hint', 'scr-game', 'app'].forEach((id) => { e[id] = $(id); });
+        'boss-hud', 'boss-hp', 'boss-hp-text', 'boss-name', 'boss', 'boss-say', 'pause', 'tut-hint', 'scr-game', 'app',
+        'call', 'call-text', 'pu-bar', 'xray-hint'].forEach((id) => { e[id] = $(id); });
       e.btns = {};
       document.querySelectorAll('#controls .dbtn').forEach((b) => { e.btns[b.dataset.choice] = b; });
       FX.floatLayer = e.floaters;
@@ -47,6 +52,10 @@
       const stopAuto = () => { if (this.chk) this.chk.user = true; };
       win.addEventListener('wheel', stopAuto, { passive: true });
       win.addEventListener('touchstart', stopAuto, { passive: true });
+      e['pu-bar'].addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-pu]');
+        if (b) this.usePowerup(b.dataset.pu);
+      });
     },
 
     /* ---------- interne Timer (pausierbar) ---------- */
@@ -66,34 +75,73 @@
       this.el['det-slot'].innerHTML = Art.detectorHTML(HHD.Store.data.skin);
     },
 
+    /** Tracking nur außerhalb des Übungsmodus (sonst ließen sich Aufgaben „farmen“) */
+    track(stat, n) { if (this.run && this.run.mode !== 'zen' && !this.tutorial) Meta.add(stat, n); },
+    trackMax(stat, v) { if (this.run && this.run.mode !== 'zen' && !this.tutorial) Meta.max(stat, v); },
+
+    musicStyle() {
+      const s = HHD.Store.settings.musicStyle || 'auto';
+      if (s !== 'auto') return s;
+      const run = this.run;
+      if (!run) return 'arcade';
+      if (run.mode === 'ramadan' || run.rush || (run.boss && run.boss.kind === 'terlik')) return 'orient';
+      return ['doener', 'night', 'mega'].includes(run.level.area) ? 'orient' : 'arcade';
+    },
+
     /* ================= RUNDE STARTEN ================= */
-    start(areaId) {
-      const area = D.AREAS.find((a) => a.id === areaId) || D.AREAS[0];
+    newRun(area, mode) {
       const levelIdx = area.level - 1;
-      this.clearTimers();
-      this.gameTime = 0;
-      this.tutorial = null;
-      this.run = {
-        areaId: area.id, startArea: area, levelIdx, level: D.LEVELS[levelIdx],
-        lives: 3, maxLives: 5, score: 0, combo: 0, maxCombo: 0, aura: 0,
+      const hard = mode === 'hardcore';
+      return {
+        mode, areaId: area.id, startArea: area, levelIdx, level: D.LEVELS[levelIdx],
+        lives: hard ? 1 : 3, maxLives: hard ? 1 : 5, score: 0, combo: 0, maxCombo: 0, aura: 0,
         correct: 0, wrong: 0, total: 0, checks: 0, fastest: 0, fastestCheck: 0, reactSum: 0, reactN: 0,
         itemsInLevel: 0, wrongStreak: 0, overchecks: [], boss: null, bossesDone: {}, bosses: 0, legendary: 0,
         queue: [], recent: [], lastTpl: null, updateJoke: false, heat: 0,
+        rush: null, rushPending: false, slowmo: 0, shield: false, xray: false, day: 1, eid: false,
+        calls: 0, lastEndlessBoss: 0, achBefore: Meta.achCount(),
       };
+    },
+
+    start(areaId, mode) {
+      const area = D.AREAS.find((a) => a.id === areaId) || D.AREAS[0];
+      mode = D.MODES[mode] ? mode : 'normal';
+      this.clearTimers();
+      this.gameTime = 0;
+      this.tutorial = null;
+      this.run = this.newRun(area, mode);
+      const run = this.run;
       this.cur = null;
       this.chk = null;
+      this.call = null;
       this.renderDetector();
       this.resetStage();
-      W.setArea(this.run.level.area);
-      W.setIntensity(this.run.level.n);
+      W.setTheme(mode === 'ramadan' ? 'ramadan' : null);
+      W.setArea(run.level.area);
+      W.setIntensity(run.level.n);
       W.setScan(false); W.setOverview(false);
-      A.music.set({ mode: 'game', level: this.run.level.n, combo: 0, boss: false, panic: false });
+      this.el['scr-game'].classList.toggle('ramadan', mode === 'ramadan');
+      A.music.set({ mode: 'game', level: run.level.n, combo: 0, boss: false, panic: false, rush: false, slow: false, style: this.musicStyle() });
       A.music.start('game');
-      A.ambience.set(this.run.level.area, true);
+      A.ambience.set(mode === 'ramadan' ? 'ramadan' : run.level.area, true);
       this.hud();
+      this.renderPowerups();
       this.state = 'cinematic';
-      this.levelBanner();
-      this.after(1.35, () => this.next());
+      const L = run.level;
+      if (mode === 'ramadan') {
+        FX.showBanner('RAMADAN MUBARAK 🌙', 'Sahur vorbei – Bismillah, los geht’s! · LEVEL ' + L.n, 'ramadan', 1600);
+        FX.emojiRain(['🌙', '⭐', '✨'], 30);
+        this.track('ramadanRun');
+      } else if (mode === 'hardcore') {
+        FX.showBanner('💀 HARDCORE', 'EIN LEBEN. DOPPELTE PUNKTE. KEIN ERBARMEN.', 'bad', 1500);
+      } else if (mode === 'zen') {
+        FX.showBanner('🧘 ÜBUNGSMODUS', 'Keine Zeit, keine Leben. Einfach lernen.', 'level', 1500);
+      } else {
+        this.levelBanner();
+      }
+      if (mode !== 'normal') { A.play('levelUp'); this.el['scr-game'].classList.toggle('apoc', L.n === 7); }
+      this.det('BISMILLAH', 'DETECTOR BEREIT', 'ok');
+      this.after(mode === 'normal' ? 1.35 : 1.65, () => this.next());
     },
 
     resetStage() {
@@ -111,7 +159,11 @@
       e['boss-hud'].hidden = true;
       e.boss.className = 'boss';
       e['tut-hint'].hidden = true;
-      e['scr-game'].classList.remove('frozen', 'zoomout', 'boss-mode', 'apoc');
+      e.call.hidden = true;
+      e['xray-hint'].hidden = true;
+      e['pu-bar'].hidden = true;
+      e['scr-game'].classList.remove('frozen', 'zoomout', 'boss-mode', 'apoc', 'slowmo', 'ramadan', 'rush');
+      W.setRush(false);
       this.setControlsMode('decide');
       FX.hideBanner();
     },
@@ -128,7 +180,8 @@
     /* ================= PRODUKT-AUSWAHL ================= */
     areaPlaces() {
       const area = D.AREAS.find((a) => a.id === this.run.level.area);
-      return area ? area.places : [];
+      const places = area ? area.places : [];
+      return this.run.mode === 'ramadan' ? places.concat(RAMADAN_PLACES) : places;
     },
 
     pickTemplate(opts) {
@@ -141,12 +194,14 @@
         if (tw && tw.tier <= L.n + 1 && !run.recent.slice(-2).includes(tw.id)) return tw;
       }
       const wantCheck = U.chance(opts.boss ? 0.35 : L.checkShare);
-      const places = opts.boss ? ['supermarkt'] : this.areaPlaces();
+      let places = this.areaPlaces();
+      if (opts.boss) places = run.boss && run.boss.kind === 'terlik' ? ['zuhause', 'iftar', 'kiosk', 'supermarkt'] : ['supermarkt'];
       let cands = D.ITEMS.filter((i) => i.tier <= L.n && (wantCheck ? i.ans === 'check' : i.ans !== 'check') && !run.recent.includes(i.id));
       if (!cands.length) cands = D.ITEMS.filter((i) => i.tier <= L.n);
       const weights = cands.map((i) => {
         let w = i.places.some((p) => places.includes(p)) ? 3 : 1;
         if (i.tier >= L.n - 1) w *= 1.5;
+        if (run.mode === 'ramadan' && i.iftar) w *= 2.5;
         return w;
       });
       return U.weighted(cands, weights);
@@ -161,12 +216,14 @@
       const inArea = tpl.places.filter((p) => places.includes(p));
       inst.place = U.pick(inArea.length ? inArea : tpl.places);
       if (tpl.ans === 'check') inst.variant = this.buildVariant(tpl, extra.forceVerdict);
+      inst.isTwin = !!(run.lastTpl && run.lastTpl.twin === tpl.id);
       // Präsentierender NPC
       if (tpl.npc) { inst.npc = tpl.npc; inst.npcLine = tpl.npcLine; }
       else if (extra.npc) { inst.npc = extra.npc; inst.npcLine = extra.npcLine; }
       else {
-        const pool = D.PLACE_NPCS[inst.place] || ['shopper'];
-        const p = inst.place === 'doener' ? 0.65 : 0.28;
+        const family = run.mode === 'ramadan' && U.chance(0.35);
+        const pool = family ? ['mama', 'tante', 'onkel', 'bruder'] : D.PLACE_NPCS[inst.place] || ['shopper'];
+        const p = family ? 1 : inst.place === 'doener' ? 0.65 : 0.28;
         if (U.chance(p)) {
           inst.npc = U.pick(pool);
           const n = D.NPCS[inst.npc];
@@ -184,7 +241,7 @@
       const prog = L.items === Infinity ? Math.min(1, run.itemsInLevel / 60) : Math.min(1, run.itemsInLevel / L.items);
       let t = U.lerp(L.time, L.minTime, prog);
       if (tpl.art.t !== 'emoji') t *= 1.15;
-      if (run.lastTpl && run.lastTpl.twin === tpl.id) t *= 1.1;
+      if (inst.isTwin) t *= 1.1;
       if (inst.disrupt) t *= inst.disrupt === 'flip' || inst.disrupt === 'partial' ? 1.25 : 1.15;
       if (inst.event) t *= 1.5;
       if (inst.legend) t *= 1.3;
@@ -196,11 +253,11 @@
     /** Wählt eine Zutaten-Variante und füllt sie je nach Level mit harmlosen Zutaten auf */
     buildVariant(tpl, forceVerdict) {
       const L = this.run.level;
-      let vs = tpl.v;
       if (tpl.id === 'doener17') return this.buildDoener17();
-      if (forceVerdict) vs = vs.filter((v) => v[0] === forceVerdict) || vs;
+      let vs = tpl.v;
+      if (forceVerdict) vs = vs.filter((v) => v[0] === forceVerdict);
       const v = U.pick(vs.length ? vs : tpl.v);
-      let list = v[1].map((x) => {
+      const list = v[1].map((x) => {
         if (Array.isArray(x)) { const flag = x[0][0] === '!'; return { ar: flag ? x[0].slice(1) : x[0], text: x[1], flag }; }
         const flag = x[0] === '!';
         return { text: flag ? x.slice(1) : x, flag };
@@ -237,17 +294,23 @@
     /** Seltene Events würfeln */
     rollSpecial() {
       const run = this.run, n = run.level.n, area = run.level.area;
-      if (U.chance(0.008)) {
-        const tpl = U.pick(D.LEGENDARY);
-        return this.makeInstance(tpl, { noDisrupt: true });
-      }
+      const ram = run.mode === 'ramadan';
+      if (U.chance(0.008)) return this.makeInstance(U.pick(D.LEGENDARY), { noDisrupt: true });
       if (n >= 2 && U.chance(area === 'doener' ? 0.015 : 0.005)) return this.makeInstance(D.EVENTS.doener17, { event: 'doener17' });
       if (n >= 2 && U.chance(0.01)) return this.makeInstance(D.EVENTS.mystery, { event: 'mystery' });
-      if (n >= 2 && U.chance(0.01)) return this.makeInstance(D.EVENTS.grandma, { event: 'grandma' });
+      if (n >= 2 && U.chance(ram ? 0.025 : 0.012)) {
+        const c = U.pick(D.EVENTS.grandma.cooks);
+        const tpl = Object.assign({}, D.EVENTS.grandma, { name: c.name, art: c.art, npc: c.npc, npcLine: c.line });
+        return this.makeInstance(tpl, { event: 'grandma' });
+      }
       if (n >= 3 && U.chance(0.01)) return this.makeInstance(D.EVENTS.arabic, { event: 'arabic' });
       if (n >= 2 && U.chance(0.012)) {
         const cands = D.ITEMS.filter((i) => i.ans === 'check' && i.tier <= n);
-        return this.makeInstance(U.pick(cands), { event: 'trust', npc: 'bro', npcLine: "BROTHER TRUST ME, IT'S HALAL." });
+        return this.makeInstance(U.pick(cands), { event: 'trust', npc: 'bro', npcLine: U.pick(D.NPCS.bro.lines) });
+      }
+      if (n >= 2 && U.chance(0.011)) {
+        const cands = D.ITEMS.filter((i) => i.ans === 'halal' && i.cat !== 'zert' && i.tier <= n);
+        return this.makeInstance(U.pick(cands), { event: 'police', npc: 'polizei', npcLine: U.pick(D.NPCS.polizei.lines), noDisrupt: true });
       }
       return null;
     },
@@ -257,10 +320,14 @@
       let inst = !opts.boss ? this.rollSpecial() : null;
       if (!inst) inst = this.makeInstance(this.pickTemplate(opts), opts);
       if (!inst.event && !opts.boss && run.level.n >= 2 && U.chance(0.008)) inst.pigeon = true;
+      this.remember(inst);
+      return inst;
+    },
+    remember(inst) {
+      const run = this.run;
       run.lastTpl = inst.tpl;
       run.recent.push(inst.id);
       if (run.recent.length > 7) run.recent.shift();
-      return inst;
     },
 
     /* ================= NÄCHSTES PRODUKT ================= */
@@ -268,16 +335,31 @@
       const run = this.run;
       if (!run || this.state === 'over') return;
       const L = run.level;
-      if (!run.boss && run.itemsInLevel >= L.items) {
-        if (L.boss && !run.bossesDone[L.n]) return this.startBoss();
-        return this.levelUp();
+      const zen = run.mode === 'zen';
+      if (run.rush) {
+        if (run.rush.left <= 0) return this.endRush();
+      } else if (!run.boss) {
+        if (run.itemsInLevel >= L.items) {
+          if (L.boss && !run.bossesDone[L.n] && !zen) return this.startBoss(L.n >= 6 ? 'terlik' : 'market');
+          return this.levelUp();
+        }
+        // Level 7: alle 25 Produkte ein Endlos-Boss
+        if (L.n === 7 && !zen && run.itemsInLevel > 0 && run.itemsInLevel % 25 === 0 && run.lastEndlessBoss !== run.itemsInLevel) {
+          run.lastEndlessBoss = run.itemsInLevel;
+          return this.startBoss(U.pick(['market', 'terlik']), 150);
+        }
+        if (run.rushPending) { run.rushPending = false; return this.startRush(); }
+        if (!zen && L.n >= 2 && U.chance(run.mode === 'ramadan' ? 0.008 : 0.005)) return this.startRush();
+        if (!zen && L.n >= 2 && U.chance(0.009)) return this.mamaCall();
+        if (L.n >= 3 && !run.updateJoke && U.chance(0.006)) return this.updateJoke();
       }
-      if (run.level.n >= 3 && !run.updateJoke && !run.boss && U.chance(0.006)) return this.updateJoke();
 
       this.clearItem();
       const e = this.el;
       let inst;
-      if (run.boss) {
+      if (run.rush) {
+        inst = this.generateRush();
+      } else if (run.boss) {
         inst = this.generate({ boss: true });
         inst.from = run.boss.side = run.boss.side === 'left' ? 'right' : 'left';
       } else {
@@ -286,10 +368,13 @@
         inst = run.queue.shift();
         while (run.queue.length < want) run.queue.push(this.generate({}));
       }
+      if (zen) inst.time = Infinity;
+      else if (run.slowmo > 0) { inst.time = (inst.time - ENTER) * 1.8 + ENTER; run.slowmo--; }
       this.cur = inst;
       inst.left = inst.time;
       inst.shownAt = this.gameTime;
       inst.decided = false;
+      Meta.see(inst.id);
 
       // Produkt ins Bild bringen
       const el = Art.makeItemEl(inst, inst.from ? 'enter-' + inst.from : 'enter');
@@ -298,6 +383,7 @@
       inst.el = el;
       e['item-slot'].appendChild(el);
       this.renderQueue();
+      e['xray-hint'].hidden = true;
 
       // Ort
       e['loc-tag'].textContent = '📍 ' + (D.PLACES[inst.place] || '');
@@ -309,6 +395,7 @@
 
       e.meme.className = 'meme';
       this.setControlsMode('decide');
+      this.renderPowerups();
 
       // Detector-Sequenz: BEEP → SCANNING... → ???
       A.play('beep');
@@ -318,18 +405,22 @@
       this.after(0.3, () => {
         if (this.cur !== inst || inst.decided) return;
         if (inst.event === 'trust') this.det('TRUST LEVEL: 0%', 'SELBST PRÜFEN!', 'warn');
+        else if (inst.event === 'police') this.det('HALAL-POLIZEI?!', 'SELBST PRÜFEN!', 'warn');
         else if (inst.event === 'doener17') { this.det('SYSTEM OVERLOAD', '17 SOSSEN ERKANNT', 'warn'); A.play('overload'); FX.shake('big'); }
         else if (inst.event === 'mystery') this.det('???', 'INHALT: UNBEKANNT', 'warn');
         else if (inst.event === 'arabic') this.det('???', 'SPRACHE: ARABISCH', 'warn');
+        else if (inst.event === 'grandma') this.det('???', 'HAUSGEMACHT – TROTZDEM PRÜFEN', 'warn');
         else if (inst.legend) this.det('LEGENDARY!', 'SELTENHEIT: 0,8%', 'ok');
-        else this.det('???', this.run.boss ? 'BOSS-PRODUKT' : '');
+        else if (inst.rush) this.det('???', 'IFTAR RUSH · ×2', 'ok');
+        else this.det('???', run.boss ? 'BOSS-PRODUKT' : '');
       });
 
       if (inst.legend) { A.play('legendary'); FX.showBanner('✦ LEGENDARY ITEM ✦', inst.name, 'legend', 1000); }
       if (inst.event === 'mystery') FX.showBanner('MYSTERY BOX', 'BROTHER… WHAT IS INSIDE?', 'event', 1100);
-      if (inst.event === 'grandma') FX.showBanner('GRANDMA MODE', 'ICH HABE DAS SELBST GEMACHT.', 'event', 1100);
+      if (inst.event === 'grandma') FX.showBanner(inst.npc === 'oma' ? 'GRANDMA MODE' : inst.npc === 'mama' ? 'MAMA MODE' : 'TANTEN-ALARM', inst.npcLine, 'event', 1100);
       if (inst.event === 'arabic') FX.showBanner('INGREDIENTS IN ARABIC', 'Genauer prüfen?', 'event', 1100);
       if (inst.event === 'trust') FX.showBanner('BROTHER TRUST ME', 'TRUST LEVEL: 0%', 'event', 1000);
+      if (inst.event === 'police') { FX.showBanner('🚨 HALAL-POLIZEI!', 'Sagt: „HARAM!“ – stimmt das wirklich?', 'event', 1000); A.play('siren'); }
       if (inst.event === 'doener17') FX.showBanner('DÖNER MIT 17 SOSSEN', 'SYSTEM OVERLOAD', 'event overload', 1200);
       if (inst.art.t !== 'emoji') A.play('rustle');
       if (inst.place === 'doener' && U.chance(0.3)) A.play('sizzle');
@@ -342,13 +433,14 @@
       if (L.n >= 7) { this.chatter(); run.heat = Math.min(100, run.heat + 2.5); this.updateHeat(); }
       if (L.n >= 2 && U.chance(0.12)) W.npcSay(U.pick(D.NPCS[U.pick(Object.keys(D.NPCS))].lines).slice(0, 26));
       if (inst.disrupt === 'bus' || U.chance(0.06)) W.spawnBus();
+      this.hud();
       this.state = 'decide';
     },
 
     renderQueue() {
       const q = this.el.queue;
       q.innerHTML = '';
-      if (this.run.boss) return;
+      if (this.run.boss || this.run.rush) return;
       this.run.queue.forEach((it, i) => {
         const d = document.createElement('div');
         d.className = 'q-item';
@@ -366,10 +458,7 @@
       p.classList.add('show');
     },
 
-    scanFx() {
-      const s = this.el.stage;
-      U.restartAnim(s, 'scanning');
-    },
+    scanFx() { U.restartAnim(this.el.stage, 'scanning'); },
 
     clearItem() {
       const e = this.el;
@@ -380,6 +469,13 @@
       }
       e['item-slot'].innerHTML = '';
       e.disrupt.innerHTML = '';
+      e['xray-hint'].hidden = true;
+    },
+    clearScene() {
+      this.clearItem();
+      this.el.queue.innerHTML = '';
+      this.el.presenter.className = 'presenter';
+      this.el.meme.className = 'meme';
     },
 
     /* ================= STÖRUNGEN ================= */
@@ -457,10 +553,227 @@
       W.overheat = h >= 85 ? 0.3 : 0;
     },
 
+    /* ================= IFTAR RUSH ================= */
+    startRush() {
+      const run = this.run;
+      this.clearScene();
+      this.state = 'cinematic';
+      run.rush = { left: 8, errors: 0 };
+      this.el['scr-game'].classList.add('rush');
+      W.setRush(true);
+      A.music.set({ rush: true, style: this.musicStyle() });
+      A.play('rush');
+      FX.showBanner('🌙 IFTAR RUSH', 'ALLES ×2 – SCANNEN, BEVOR DIE SUPPE KALT WIRD!', 'ramadan', 1500);
+      FX.emojiRain(['🌙', '⭐', '✨', '🥛', '🫖'], 40);
+      this.det('IFTAR RUSH', '8 PRODUKTE · ×2', 'ok');
+      this.hud();
+      this.after(1.6, () => this.next());
+    },
+    generateRush() {
+      const run = this.run;
+      let tpl;
+      if (U.chance(0.15)) tpl = D.ITEMS.find((i) => i.id === U.pick(D.RUSH_TRAPS));
+      if (!tpl) {
+        const pool = D.ITEMS.filter((i) => i.iftar && !run.recent.includes(i.id));
+        tpl = U.pick(pool.length ? pool : D.ITEMS.filter((i) => i.iftar));
+      }
+      const fam = U.chance(0.5);
+      const inst = this.makeInstance(tpl, { noDisrupt: true, npc: fam ? U.pick(['mama', 'tante', 'onkel']) : null, npcLine: fam ? U.pick(D.LINES.rush) : null });
+      inst.time = (inst.time - ENTER) * 0.85 + ENTER;
+      inst.rush = true;
+      this.remember(inst);
+      run.rush.left--;
+      return inst;
+    },
+    endRush() {
+      const run = this.run, r = run.rush;
+      run.rush = null;
+      this.clearScene();
+      this.state = 'cinematic';
+      this.el['scr-game'].classList.remove('rush');
+      W.setRush(false);
+      A.music.set({ rush: false, style: this.musicStyle() });
+      if (r.errors === 0) {
+        this.addAura(500);
+        this.grantPowerup();
+        this.track('rushPerfect');
+        A.play('crowd', 'cheer');
+        FX.showBanner('ALHAMDULILLAH – SATT! 🌙', 'PERFEKTER IFTAR RUSH · +500 AURA · 🎁 POWER-UP', 'ramadan', 1600);
+        FX.confettiRain(70);
+      } else {
+        this.addAura(200);
+        FX.showBanner('ALHAMDULILLAH – SATT!', r.errors + ' FEHLER · +200 AURA', 'ramadan', 1400);
+      }
+      this.det('IFTAR', 'BEENDET', 'ok');
+      this.hud(true);
+      this.after(1.7, () => this.next());
+    },
+
+    /* ================= MAMA RUFT AN ================= */
+    mamaCall() {
+      const run = this.run, e = this.el;
+      FX.hideBanner();
+      this.clearItem();
+      e.presenter.className = 'presenter';
+      e.meme.className = 'meme';
+      run.calls++;
+      this.call = { left: 3.2, total: 3.2, ring: 0 };
+      e.call.hidden = false;
+      e.call.className = 'call ringing';
+      e['call-text'].textContent = 'MAMA RUFT AN…';
+      this.setControlsMode('call');
+      this.det('📞 ANRUF', 'MAMA ❤️', 'warn');
+      A.play('ring');
+      this.state = 'call';
+    },
+    answerCall(accept) {
+      const c = this.call, e = this.el;
+      if (!c) return;
+      this.call = null;
+      this.state = 'feedback';
+      if (accept) {
+        e.call.className = 'call talking';
+        e['call-text'].textContent = U.pick(D.LINES.mamaCall);
+        this.addAura(150);
+        this.track('mamaOk');
+        A.play('correct', 5);
+        this.memeText('MAMA-LIEBLING ❤️', '+150 AURA. Mama ist zufrieden. Vorerst.', 'ok');
+        this.det('ANRUF BEENDET', 'MAMA: ZUFRIEDEN', 'ok');
+        this.after(1.7, () => { e.call.hidden = true; this.next(); });
+      } else {
+        e.call.className = 'call declined';
+        e['call-text'].textContent = 'MAMA HAT AUFGELEGT…';
+        this.addAura(-300);
+        this.memeText('DU HAST MAMA WEGGEDRÜCKT?!', '−300 AURA. Das gibt Ärger…', 'err');
+        this.det('ANRUF ABGELEHNT', 'TERLIK INCOMING', 'err');
+        this.after(0.45, () => this.terlikThrow());
+        this.after(2.0, () => { e.call.hidden = true; this.next(); });
+      }
+      this.setControlsMode('decide');
+      this.hud(true);
+    },
+
+    /* ================= TERLIK ================= */
+    terlikThrow(light) {
+      FX.terlik(light);
+      A.play('swoosh');
+      setTimeout(() => { A.play('slap'); if (!light) FX.crack(); }, 430);
+      this.track('terlikHit');
+    },
+
+    /* ================= RAMADAN: TAGE & EID ================= */
+    ramadanDay() {
+      const run = this.run;
+      const day = Math.min(30, 1 + Math.floor(run.correct / 3));
+      if (day === run.day) return false;
+      run.day = day;
+      if (day === 30 && !run.eid) { run.eid = true; this.eid(); return true; }
+      if (day % 10 === 0) FX.toast('🌙 TAG ' + day + ' VON 30 – MASHALLAH!', 1600);
+      return false;
+    },
+    eid() {
+      const S = HHD.Store.data;
+      S.coins += 500;
+      const skinNew = !S.owned.includes('sultan');
+      if (skinNew) S.owned.push('sultan');
+      HHD.Store.save();
+      this.track('eid');
+      this.trackMax('skins', S.owned.length);
+      this.addAura(1000);
+      A.play('eid');
+      FX.confettiRain(150);
+      FX.emojiRain(['🎉', '🌙', '⭐', '🍬', '🎁'], 50);
+      FX.showBanner('EID MUBARAK! 🎉', 'BAYRAM-GELD +500 🪙' + (skinNew ? ' · SULTAN-SKIN FREI' : '') + ' · AB JETZT ×1,5', 'ramadan', 2400);
+      this.det('EID MUBARAK', 'BAYRAM-BONUS AKTIV', 'ok');
+    },
+
+    /* ================= POWER-UPS ================= */
+    renderPowerups() {
+      const bar = this.el['pu-bar'];
+      const run = this.run;
+      if (!run || run.mode === 'zen' || this.tutorial) { bar.hidden = true; return; }
+      const inv = HHD.Store.data.pu;
+      bar.innerHTML = Object.keys(D.POWERUPS).map((k) => {
+        const p = D.POWERUPS[k];
+        const n = inv[k] || 0;
+        const active = (k === 'slowmo' && run.slowmo > 0) || (k === 'dua' && run.shield) || (k === 'xray' && run.xray);
+        return '<button type="button" class="pu-btn' + (n ? '' : ' empty') + (active ? ' active' : '') + '" data-pu="' + k + '" aria-label="' + p.name + '" title="' + U.esc(p.name + ': ' + p.desc) + '">' +
+          '<span>' + p.icon + '</span><b>' + n + '</b>' + (k === 'slowmo' && run.slowmo > 0 ? '<i>' + run.slowmo + '</i>' : '') + '</button>';
+      }).join('');
+      bar.hidden = false;
+      this.el['scr-game'].classList.toggle('slowmo', run.slowmo > 0);
+      A.music.set({ slow: run.slowmo > 0 });
+    },
+    grantPowerup(k) {
+      const S = HHD.Store.data;
+      k = k || U.pick(Object.keys(D.POWERUPS));
+      S.pu[k] = (S.pu[k] || 0) + 1;
+      HHD.Store.save();
+      const p = D.POWERUPS[k];
+      FX.toast('🎁 POWER-UP: ' + p.icon + ' ' + p.name, 1800);
+      this.renderPowerups();
+    },
+    usePowerup(k) {
+      const run = this.run, S = HHD.Store.data, p = D.POWERUPS[k];
+      if (!p || this.paused || this.tutorial || !run || run.mode === 'zen') return;
+      if (!['decide', 'check', 'feedback', 'cinematic'].includes(this.state)) return;
+      if (!S.pu[k]) { FX.toast('Keine ' + p.icon + ' ' + p.name + ' mehr – gibt’s im Shop!'); A.play('tapBad'); return; }
+      if (k === 'xray') {
+        if (this.state === 'decide' && this.cur && !this.cur.decided) {
+          if (this.cur.ans === 'check') { run.xray = true; this.consume(k); return this.input('check'); }
+          this.xrayHint();
+        } else if (this.state === 'check' && this.chk) {
+          this.xrayCheck();
+        } else { FX.toast('🔍 Röntgen geht nur, wenn gerade ein Produkt da ist.'); return; }
+      } else if (k === 'slowmo') {
+        if (run.slowmo > 0) { FX.toast('⏳ Die Zeitlupe läuft schon.'); return; }
+        run.slowmo = 6;
+        if (this.state === 'decide' && this.cur && !this.cur.decided && isFinite(this.cur.time)) { this.cur.left += 1.2; this.cur.time += 1.2; }
+        FX.showBanner('⏳ ZEITLUPE', 'Die nächsten 6 Produkte: fast doppelte Zeit', 'level', 900);
+      } else if (k === 'dua') {
+        if (run.shield) { FX.toast('🤲 Mamas Dua schützt dich schon.'); return; }
+        run.shield = true;
+        FX.showBanner('🤲 MAMAS DUA', 'Der nächste Fehler kostet kein Leben', 'ramadan', 1000);
+      }
+      this.consume(k);
+    },
+    consume(k) {
+      const S = HHD.Store.data;
+      S.pu[k] = Math.max(0, (S.pu[k] || 0) - 1);
+      HHD.Store.save();
+      A.play('powerup');
+      this.renderPowerups();
+      this.hud();
+    },
+    xrayHint() {
+      const cur = this.cur, h = this.el['xray-hint'];
+      h.innerHTML = '🔍 RÖNTGEN: <b>' + U.esc(CHOICE_LABEL[cur.ans]) + '</b>';
+      h.className = 'xray-hint ' + cur.ans;
+      h.hidden = false;
+    },
+    xrayCheck() {
+      const chk = this.chk;
+      if (!chk) return;
+      let first = null;
+      this.el['ing-list'].querySelectorAll('.ing-chip').forEach((b) => {
+        const it = chk.list[+b.dataset.i];
+        if (it && it.flag) { b.classList.add('xray'); if (!first) first = b; }
+      });
+      chk.user = true;
+      if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); this.el['ing-sub'].textContent = '🔍 RÖNTGEN: Das Leuchtende ist das Problem → antippen!'; }
+      else this.el['ing-sub'].textContent = '🔍 RÖNTGEN: Kein Problem gefunden → ✅ HALAL';
+      this.el['ing-sub'].classList.add('xray-note');
+    },
+
     /* ================= EINGABE ================= */
     input(choice) {
       if (this.paused) return;
       if (this.tutorial) return this.tutorialInput(choice);
+      if (this.state === 'call') {
+        if (choice === 'halal') return this.answerCall(true);
+        if (choice === 'haram') return this.answerCall(false);
+        return;
+      }
       const cur = this.cur;
       if (this.state === 'decide' && cur && !cur.decided) {
         A.play('click');
@@ -495,14 +808,18 @@
 
     /* ================= ERGEBNISSE ================= */
     points(frac, o) {
-      const run = this.run;
+      const run = this.run, cur = this.cur;
       const base = 100 * (1 + (run.level.n - 1) * 0.25);
       const combo = 1 + Math.min(run.combo, 50) * 0.1;
       let p = base * (1 + frac) * combo;
       if (o.check) p *= 1.5;
       if (o.found) p *= 1.2;
-      if (this.cur && this.cur.legend) p *= 5;
+      if (cur && cur.legend) p *= 5;
+      if (cur && cur.rush) p *= 2;
       if (run.boss) p *= 1.2;
+      if (run.mode === 'hardcore') p *= 2;
+      if (run.eid) p *= 1.5;
+      if (run.mode === 'zen') p *= 0.25;
       return Math.round(p / 10) * 10;
     },
 
@@ -510,16 +827,18 @@
       const run = this.run, cur = this.cur;
       cur.decided = true;
       this.state = 'feedback';
-      run.correct++; run.total++; run.combo++; run.itemsInLevel++;
+      this.el['xray-hint'].hidden = true;
+      run.correct++; run.total++; run.combo++;
+      if (!cur.rush) run.itemsInLevel++;
       run.maxCombo = Math.max(run.maxCombo, run.combo);
       run.wrongStreak = 0;
       if (cur.legend) run.legendary++;
       let frac;
       if (o.check) {
-        frac = this.chk ? U.clamp(this.chk.left / this.chk.total, 0, 1) : 0.5;
+        frac = this.chk && isFinite(this.chk.total) ? U.clamp(this.chk.left / this.chk.total, 0, 1) : 0.5;
         if (!run.fastestCheck || o.dur < run.fastestCheck) run.fastestCheck = +o.dur.toFixed(3);
       } else {
-        frac = U.clamp(1 - (rt - ENTER) / (cur.time - ENTER), 0, 1);
+        frac = isFinite(cur.time) ? U.clamp(1 - (rt - ENTER) / (cur.time - ENTER), 0, 1) : 0.5;
         const r = Math.max(0.05, rt);
         if (!run.fastest || r < run.fastest) run.fastest = +r.toFixed(3);
         run.reactSum += r; run.reactN++;
@@ -527,7 +846,19 @@
       const pts = this.points(frac, o);
       run.score += pts;
 
-      // Aura
+      // Tracking (Missionen & Erfolge)
+      this.track('correct');
+      this.trackMax('combo', run.combo);
+      if (o.check) this.track('checkOk');
+      if (o.found) { this.track('found'); if (/gelatine/i.test(o.found.text) && /schwein/i.test(o.found.text)) this.track('gelatineFound'); }
+      if (!o.check && rt < 0.6) this.track('fast');
+      if (!o.check && rt < 0.45) this.track('blitz');
+      if (cur.place === 'doener') this.track('doenerOk');
+      if (cur.isTwin) this.track('twinOk');
+      if (cur.legend) this.track('legend');
+      if (cur.event === 'doener17') this.track('sauce17');
+
+      // Aura & Sprüche
       let aura = 0, line, sub = '';
       const tier = o.check ? 'correctCheck' : cur.ans === 'haram' ? 'correctHaram' : 'correctHalal';
       line = U.pick(D.LINES[tier]);
@@ -537,6 +868,12 @@
       else if (!o.check && rt < 0.55) { aura += 100; line = U.pick(D.LINES.instant); }
       else if (!o.check && frac < 0.12) { aura -= 50; line = 'KNAPP… ZU LANGE GEZÖGERT.'; }
       if (cur.legend) { aura += 500; line = 'LEGENDARY GESICHERT ✦'; }
+      if (cur.event === 'police') {
+        aura += 200;
+        line = 'EIGENE MEINUNG. RESPEKT. 🧠';
+        sub = 'Halal-Polizei sagt HARAM – aber ' + cur.name + ' ist eindeutig halal.';
+        this.track('policeOk');
+      }
       if (o.check && cur.variant && cur.variant.note) sub = cur.variant.note;
       else if (o.check && !sub) sub = cur.variant.verdict === 'haram' ? 'Drin war: ' + this.flagText(cur) + ' → HARAM' : 'Alle Zutaten unproblematisch → HALAL';
       else if (!sub) sub = this.explain(cur);
@@ -550,6 +887,7 @@
       const skin = D.SKINS.find((s) => s.id === HHD.Store.data.skin) || D.SKINS[0];
       FX.burst(c.x, c.y, { n: 18 + Math.min(40, run.combo), colors: [skin.laser, '#ffffff', '#ffe45e', '#5ec8ff'] });
       if (cur.legend) FX.burst(c.x, c.y, { n: 30, text: '✦', colors: ['#ffd700'], smin: 5, smax: 9 });
+      if (cur.rush || run.mode === 'ramadan') FX.burst(c.x, c.y, { n: 6, text: U.pick(['🌙', '⭐', '✨']), smin: 5, smax: 8, colors: ['#fff'] });
       FX.flash('rgba(61,255,139,0.28)');
       FX.float('+' + U.fmt(pts), c.x, c.y - 30, 'pts');
       if (aura) FX.float(U.fmtSigned(aura) + ' AURA', c.x + 40, c.y + 10, aura > 0 ? 'aura' : 'neg');
@@ -566,6 +904,7 @@
         if (run.boss.hp <= 0) { this.after(0.5, () => this.bossDefeated()); return; }
       }
       if (this.comboMilestone()) return;
+      if (run.mode === 'ramadan' && this.ramadanDay()) { this.state = 'cinematic'; this.after(2.6, () => this.next()); this.hud(); return; }
       this.after(this.fbDelay(true), () => this.next());
     },
 
@@ -574,16 +913,28 @@
       return ok ? Math.max(0.3, 0.46 - n * 0.02) : 1.3;
     },
 
+    /** Leben abziehen – außer im Übungsmodus oder wenn Mamas Dua schützt */
+    loseLife() {
+      const run = this.run;
+      if (run.mode === 'zen') return 'zen';
+      if (run.shield) { run.shield = false; return 'shield'; }
+      run.lives--;
+      return 'lost';
+    },
+
     /** Falsch – inkl. Raten, Timeout, falsches Zutaten-Urteil */
     wrong(choice, rt, kind, info) {
       const run = this.run, cur = this.cur;
       cur.decided = true;
       this.state = 'feedback';
-      run.wrong++; run.total++; run.itemsInLevel++;
+      this.el['xray-hint'].hidden = true;
+      run.wrong++; run.total++;
+      if (!cur.rush) run.itemsInLevel++;
+      else if (run.rush) run.rush.errors++;
       run.wrongStreak++;
       run.lvlErr = (run.lvlErr || 0) + 1;
       const broke = this.breakCombo();
-      run.lives--;
+      const life = this.loseLife();
       let aura, line, sub;
       if (kind === 'timeout') {
         aura = -200; line = U.pick(D.LINES.timeout);
@@ -599,34 +950,40 @@
         sub = cur.variant.verdict === 'haram' ? 'Das Problem war: ' + this.flagText(cur) : 'Es war alles okay → HALAL';
       } else if (kind === 'overcheck') {
         aura = -150; line = info.line; sub = info.sub;
+      } else if (cur.event === 'police') {
+        aura = -400; line = 'DU HAST DER HALAL-POLIZEI GEGLAUBT 💀';
+        sub = cur.name + ' ist halal. Selbst prüfen statt nachplappern.';
       } else {
         const obvious = cur.tpl.tier <= 2;
         aura = obvious ? -500 : -300;
         line = obvious ? '-500 AURA' : U.pick(D.LINES.wrong);
         sub = this.explain(cur);
         if (obvious && U.chance(0.5)) line = U.pick(['WIE HAST DU DAS NICHT GESEHEN?', 'BRO…', '-500 AURA']);
+        if (choice === 'halal' && cur.ans === 'haram') line = U.pick(D.LINES.haramAsHalal);
       }
       let big = false;
-      if (run.wrongStreak >= 3) { aura -= 900; big = true; }
+      if (run.wrongStreak >= 3 && run.mode !== 'zen') { aura -= 900; big = true; }
       this.addAura(aura);
 
       this.det('ERROR 404', 'COMMON SENSE NOT FOUND', 'err');
       A.play('wrong');
-      if (big) { A.play('boom'); A.play('crowd', 'ooh'); }
+      if (big) { A.play('boom'); A.play('crowd', 'ooh'); this.terlikThrow(); }
       else if (U.chance(0.4)) A.play('error404');
       FX.flash('rgba(255,40,70,0.35)');
       FX.shake(big ? 'big' : 'small');
       const c = this.itemCenter();
       FX.burst(c.x, c.y, { n: 14, colors: ['#ff3b5c', '#1d1433', '#ff9f1c'], min: 80, max: 260 });
       FX.float(U.fmtSigned(aura) + ' AURA' + (big ? ' 💀' : ''), c.x, c.y - 20, 'neg');
-      if (kind !== 'overcheck') FX.float('−1 ❤️', c.x - 50, c.y + 20, 'neg');
+      if (life === 'lost') FX.float('−1 ❤️', c.x - 50, c.y + 20, 'neg');
+      else if (life === 'shield') { FX.float('🤲 GESCHÜTZT', c.x - 50, c.y + 20, 'aura'); FX.toast('🤲 MAMAS DUA HAT DICH GESCHÜTZT!', 1600); }
       const chip = kind === 'checkwrong' || kind === 'checktimeout' ? CHOICE_LABEL[cur.variant.verdict] : CHOICE_LABEL[cur.ans];
       this.memeText(line, sub, 'err', chip);
-      if (big) FX.showBanner('-900 AURA 💀', '3× HINTEREINANDER FALSCH', 'bad', 1100);
+      if (big) FX.showBanner('🩴 TERLIK INCOMING', '3× FALSCH – MAMA HAT ES GESEHEN · −900 AURA', 'bad', 1200);
       else if (broke) FX.showBanner('COMBO BROKEN 💀', '', 'bad small', 800);
       if (cur.el) cur.el.classList.add('exit-bad');
       if (run.boss) { run.boss.hp = Math.min(run.boss.max, run.boss.hp + 5); this.bossLaugh(); }
       this.hud(true);
+      this.renderPowerups();
       if (run.lives <= 0) { this.after(0.9, () => this.gameOver()); return; }
       this.after(this.fbDelay(false), () => this.next());
     },
@@ -637,7 +994,9 @@
         // Glück gehabt: kein Leben weg, aber Combo & Aura
         const run = this.run;
         this.state = 'feedback';
-        run.total++; run.itemsInLevel++;
+        run.total++;
+        if (!cur.rush) run.itemsInLevel++;
+        else if (run.rush) run.rush.errors++;
         run.lvlErr = (run.lvlErr || 0) + 1;
         const broke = this.breakCombo();
         this.addAura(-300);
@@ -663,6 +1022,7 @@
       if (cur.tpl.cat === 'zert') line = 'DA STEHT „HALAL ✓“ DRAUF, BRO. 💀';
       else if (cur.tpl.cat === 'schwein') line = 'ES IST LITERALLY SCHWEIN. 💀';
       else if (cur.tpl.cat === 'alkohol') line = 'ES IST ALKOHOL, BRUDER. 💀';
+      if (cur.event === 'police') line = 'DIE POLIZEI HAT DICH VERUNSICHERT. 💀';
       const sub = 'Offensichtlich → ' + CHOICE_LABEL[cur.ans] + '. Nicht alles checken!';
       const now = run.total;
       run.overchecks = run.overchecks.filter((t) => now - t < 5);
@@ -673,7 +1033,9 @@
         return this.wrong('check', rt, 'overcheck', { line: 'BRUDER CHECKT EINFACH ALLES. 💀', sub });
       }
       this.state = 'feedback';
-      run.total++; run.itemsInLevel++;
+      run.total++;
+      if (!cur.rush) run.itemsInLevel++;
+      else if (run.rush) run.rush.errors++;
       run.lvlErr = (run.lvlErr || 0) + 1;
       const broke = this.breakCombo();
       this.addAura(-100);
@@ -705,8 +1067,7 @@
     },
     checkReveal(cur) {
       const v = cur.variant;
-      const s = v.verdict === 'haram' ? 'Drin war: ' + this.flagText(cur) + ' → HARAM.' : 'Zutaten waren okay → HALAL.';
-      return s;
+      return v.verdict === 'haram' ? 'Drin war: ' + this.flagText(cur) + ' → HARAM.' : 'Zutaten waren okay → HALAL.';
     },
 
     breakCombo() {
@@ -747,6 +1108,8 @@
         A.play('lifeUp');
         FX.toast('❤️ +1 LEBEN');
       }
+      if ([15, 40, 60].includes(c) && run.mode !== 'zen') this.grantPowerup();
+      if (c === 15) { FX.emojiRain(['🌙', '⭐', '✨'], 35); A.play('mashallah'); }
       const d = this.el['det-slot'].querySelector('.det');
       if (c >= 50 && d) d.classList.add('overclock');
       if (c === 75) W.setScan(true);
@@ -791,43 +1154,51 @@
       run.level = D.LEVELS[run.levelIdx];
       run.itemsInLevel = 0;
       run.queue = [];
-      this.clearItem();
-      this.el.queue.innerHTML = '';
-      this.el.presenter.className = 'presenter';
-      this.el.meme.className = 'meme';
+      this.trackMax('level', run.level.n);
+      if (run.mode === 'hardcore') this.trackMax('hardcoreLevel', run.level.n);
+      if (run.mode === 'ramadan') run.rushPending = true;
+      this.clearScene();
       this.state = 'cinematic';
       W.setArea(run.level.area);
       W.setIntensity(run.level.n);
-      A.music.set({ level: run.level.n });
-      A.ambience.set(run.level.area, true);
+      A.music.set({ level: run.level.n, style: this.musicStyle() });
+      A.ambience.set(run.mode === 'ramadan' ? 'ramadan' : run.level.area, true);
       this.levelBanner();
       FX.confettiRain(50);
       this.hud();
       this.after(1.5, () => this.next());
     },
 
-    /* ================= BOSS: DER SUPERMARKT ================= */
-    startBoss() {
+    /* ================= BOSSE: DER SUPERMARKT & MAMAS TERLIK ================= */
+    startBoss(kind, hp) {
       const run = this.run;
-      this.clearItem();
-      this.el.queue.innerHTML = '';
-      this.el.presenter.className = 'presenter';
-      this.el.meme.className = 'meme';
+      kind = kind || 'market';
+      hp = hp || 100;
+      this.clearScene();
       this.state = 'cinematic';
-      run.boss = { hp: 100, max: 100, side: 'right', n: run.bosses + 1 };
+      if (run.rush) { run.rush = null; this.el['scr-game'].classList.remove('rush'); W.setRush(false); }
+      run.boss = { hp, max: hp, side: 'right', n: run.bosses + 1, kind };
       run.queue = [];
       this.el['scr-game'].classList.add('boss-mode');
-      this.el.boss.className = 'boss show';
+      this.el.boss.className = 'boss show ' + kind;
       this.el['boss-hud'].hidden = false;
+      this.el['boss-name'].textContent = kind === 'terlik' ? '🩴 BOSS' : '🏪 BOSS';
       this.updateBossHud();
-      A.music.set({ boss: true });
+      A.music.set({ boss: true, rush: false, style: this.musicStyle() });
       A.play('boom');
       A.play('bossLaugh');
       FX.shake('big');
-      const title = run.boss.n > 1 ? 'DER SUPERMARKT 2: NACHTSCHICHT' : 'DER SUPERMARKT';
-      FX.showBanner('BOSS: ' + title, 'Produkte fliegen von links und rechts!', 'boss', 1900);
-      this.det('WARNUNG', 'BOSS ERKANNT', 'err');
-      this.bossSay('ZUTATEN? HAHA!');
+      if (kind === 'terlik') {
+        FX.showBanner('BOSS: MAMAS TERLIK 🩴', '„WIR HABEN ESSEN ZU HAUSE!“ – jeder Fehler: KLATSCH!', 'boss', 1900);
+        this.det('WARNUNG', 'MAMA IST SAUER', 'err');
+        this.bossSay('ICH ZÄHLE BIS DREI!');
+      } else {
+        const title = run.boss.n > 1 ? 'DER SUPERMARKT 2: NACHTSCHICHT' : 'DER SUPERMARKT';
+        FX.showBanner('BOSS: ' + title, 'Produkte fliegen von links und rechts!', 'boss', 1900);
+        this.det('WARNUNG', 'BOSS ERKANNT', 'err');
+        this.bossSay('ZUTATEN? HAHA!');
+      }
+      this.hud();
       this.after(2.1, () => this.next());
     },
 
@@ -843,29 +1214,37 @@
       s.textContent = text;
       U.restartAnim(s, 'show');
     },
-    bossTaunt() { if (U.chance(0.45)) this.bossSay(U.pick(D.LINES.bossTaunt)); },
+    bossLines(type) {
+      const terlik = this.run.boss && this.run.boss.kind === 'terlik';
+      return D.LINES[(terlik ? 'terlik' : 'boss') + type];
+    },
+    bossTaunt() { if (U.chance(0.45)) this.bossSay(U.pick(this.bossLines('Taunt'))); },
     bossHit() {
       this.updateBossHud();
       U.restartAnim(this.el.boss, 'hit');
       A.play('bossHit');
-      if (U.chance(0.5)) this.bossSay(U.pick(D.LINES.bossHurt));
+      if (U.chance(0.5)) this.bossSay(U.pick(this.bossLines('Hurt')));
     },
     bossLaugh() {
       this.updateBossHud();
       U.restartAnim(this.el.boss, 'laugh');
       A.play('bossLaugh');
-      this.bossSay('HAHAHA! +5 HP');
+      if (this.run.boss.kind === 'terlik') { this.bossSay('HAB ICH DOCH GESAGT! +5 HP'); this.terlikThrow(true); }
+      else this.bossSay('HAHAHA! +5 HP');
     },
     bossDefeated() {
       const run = this.run;
       const lvl = run.level.n;
+      const kind = run.boss.kind;
       run.bossesDone[lvl] = true;
       run.bosses++;
       run.boss = null;
       this.clearItem();
       this.state = 'cinematic';
-      this.el.boss.className = 'boss show dead';
-      A.music.set({ boss: false });
+      this.el.boss.className = 'boss show dead ' + kind;
+      this.track('boss');
+      this.track(kind === 'terlik' ? 'bossTerlik' : 'bossMarket');
+      A.music.set({ boss: false, style: this.musicStyle() });
       A.play('boom');
       A.play('crowd', 'cheer');
       const bonus = 2500 * run.bosses;
@@ -873,11 +1252,16 @@
       this.addAura(500);
       if (run.lives < run.maxLives) run.lives++;
       FX.confettiRain(120);
-      FX.showBanner('SUPERMARKET CLEARED', '+' + U.fmt(bonus) + ' · +500 AURA · ❤️ +1', 'boss win', 1500);
-      this.det('SUPERMARKET', 'CLEARED', 'ok');
+      if (kind === 'terlik') {
+        FX.showBanner('TERLIK BESIEGT! 🩴', 'MAMA IST STOLZ · +' + U.fmt(bonus) + ' · +500 AURA', 'boss win', 1500);
+        this.det('TERLIK', 'ENTSCHÄRFT', 'ok');
+      } else {
+        FX.showBanner('SUPERMARKET CLEARED', '+' + U.fmt(bonus) + ' · +500 AURA · ❤️ +1', 'boss win', 1500);
+        this.det('SUPERMARKET', 'CLEARED', 'ok');
+      }
       this.hud(true);
       this.after(1.6, () => {
-        FX.showBanner('HALAL DETECTOR LEVEL UP', 'Weiter geht’s. Schneller.', 'level', 1200);
+        FX.showBanner('HALAL DETECTOR LEVEL UP', kind === 'terlik' ? 'Alhamdulillah. Weiter geht’s.' : 'Weiter geht’s. Schneller.', 'level', 1200);
         A.play('levelUp');
         this.det('LEVEL UP', 'DETECTOR v' + (run.bosses + 1) + '.0', 'ok');
       });
@@ -895,15 +1279,18 @@
       cur.decided = true; // Hauptentscheidung getroffen
       this.state = 'check';
       run.checks++;
+      e['xray-hint'].hidden = true;
       const v = cur.variant;
-      let total = this.tutorial ? Infinity : L.checkTime + Math.max(0, v.list.length - 6) * 0.22;
+      let total = this.tutorial || run.mode === 'zen' ? Infinity : L.checkTime + Math.max(0, v.list.length - 6) * 0.22;
       if (cur.event === 'doener17') total = Math.max(total, 9);
       if (cur.event === 'arabic') total += 1.2;
+      if (run.slowmo > 0 && isFinite(total)) total *= 1.4;
       this.chk = { left: total, total, list: v.list, opened: this.gameTime, user: false, translated: !cur.tpl.arabic, auto: 0 };
       e['ing-pack'].innerHTML = Art.itemArt(cur);
       e['ing-title'].textContent = cur.name;
-      e['ing-tag'].textContent = cur.event === 'doener17' ? 'SYSTEM OVERLOAD' : cur.event === 'grandma' ? 'OMAS HANDSCHRIFT' : cur.event === 'arabic' ? 'INGREDIENTS IN ARABIC' : cur.event === 'mystery' ? 'INHALT DER BOX' : 'ZUTATEN';
+      e['ing-tag'].textContent = cur.event === 'doener17' ? 'SYSTEM OVERLOAD' : cur.event === 'grandma' ? 'HANDSCHRIFTLICH' : cur.event === 'arabic' ? 'INGREDIENTS IN ARABIC' : cur.event === 'mystery' ? 'INHALT DER BOX' : 'ZUTATEN';
       e['ing-sub'].textContent = cur.event === 'mystery' ? 'Was ist drin? Tippe auf das Problem – oder entscheide.' : 'Tippe auf das Problem – oder entscheide unten.';
+      e['ing-sub'].classList.remove('xray-note');
       this.renderIngredients();
       e['ing-window'].scrollTop = 0;
       e.ing.className = 'ing' + (cur.event === 'grandma' ? ' hand' : '') + (cur.event === 'doener17' ? ' overload' : '') + (cur.event === 'arabic' ? ' arabic' : '');
@@ -917,8 +1304,18 @@
         this.after(1.0, () => {
           if (!this.chk || this.cur !== cur) return;
           this.det('ÜBERSETZE…', 'AR → DE', 'scan');
-          this.after(0.5, () => { if (this.chk && this.cur === cur) { this.chk.translated = true; this.renderIngredients(); this.det('ÜBERSETZT', 'JETZT LESEN', 'ok'); } });
+          this.after(0.5, () => {
+            if (this.chk && this.cur === cur) {
+              this.chk.translated = true;
+              this.renderIngredients();
+              this.det('ÜBERSETZT', 'JETZT LESEN', 'ok');
+              if (run.xray) { run.xray = false; this.xrayCheck(); this.renderPowerups(); }
+            }
+          });
         });
+      } else if (run.xray) {
+        run.xray = false;
+        this.after(0.25, () => { if (this.chk && this.cur === cur) { this.xrayCheck(); this.renderPowerups(); } });
       }
     },
 
@@ -969,7 +1366,6 @@
     },
 
     checkTimeout() {
-      const cur = this.cur;
       if (!this.chk) return;
       this.state = 'feedback';
       this.revealCheck();
@@ -998,13 +1394,20 @@
     },
 
     setControlsMode(mode) {
-      const c = this.el.controls;
+      const c = this.el.controls, b = this.el.btns;
       c.classList.toggle('mode-check', mode === 'check');
-      const chkBtn = this.el.btns.check;
-      if (chkBtn) {
-        chkBtn.querySelector('.lb').textContent = mode === 'check' ? 'LESEN…' : 'INGREDIENTS';
-        chkBtn.setAttribute('aria-disabled', mode === 'check' ? 'true' : 'false');
-      }
+      c.classList.toggle('mode-call', mode === 'call');
+      const L = {
+        decide: [['✅', 'HALAL'], ['🔎', 'INGREDIENTS'], ['❌', 'HARAM']],
+        check: [['✅', 'HALAL'], ['🔎', 'LESEN…'], ['❌', 'HARAM']],
+        call: [['📞', 'ANNEHMEN'], ['🔔', 'KLINGELT…'], ['📵', 'WEGDRÜCKEN']],
+      }[mode] || null;
+      if (!L || !b.halal) return;
+      ['halal', 'check', 'haram'].forEach((k, i) => {
+        b[k].querySelector('.ic').textContent = L[i][0];
+        b[k].querySelector('.lb').textContent = L[i][1];
+      });
+      b.check.setAttribute('aria-disabled', mode === 'decide' ? 'false' : 'true');
     },
 
     /* ================= GAME OVER ================= */
@@ -1019,44 +1422,70 @@
       this.det('SYSTEM FAILURE.', 'GAME OVER', 'err');
       this.el['scr-game'].classList.add('frozen');
       FX.showBanner('SYSTEM FAILURE.', '', 'bad over', 1400);
-      const acc = run.total ? Math.round((run.correct / run.total) * 100) : 0;
+      setTimeout(() => HHD.UI.showGameOver(this.summary()), 1500);
+    },
+
+    /** Runde auswerten und speichern (auch beim Beenden im Übungsmodus) */
+    summary() {
+      const run = this.run;
+      const S = HHD.Store;
+      const zen = run.mode === 'zen';
+      const acc = run.total ? Math.min(100, Math.round((run.correct / run.total) * 100)) : 0;
       const rank = D.RANKS.filter((r) => run.score >= r[0]).pop();
-      const xp = Math.round(run.score / 20 + run.correct * 5 + run.bosses * 200);
-      const coins = Math.round(run.score / 25 + run.correct * 2);
+      let xp = Math.round(run.score / 20 + run.correct * 5 + run.bosses * 200);
+      let coins = Math.round(run.score / 25 + run.correct * 2);
+      if (run.mode === 'hardcore') coins = Math.round(coins * 1.5);
+      if (zen) { xp = Math.round(run.correct * 2); coins = Math.round(run.correct); }
       const area = D.AREAS.find((a) => a.id === run.level.area);
       const summary = {
-        score: run.score, maxCombo: run.maxCombo, fastest: run.fastest, correct: run.correct, wrong: run.wrong,
+        mode: run.mode, score: run.score, maxCombo: run.maxCombo, fastest: run.fastest, correct: run.correct, wrong: run.wrong,
         aura: run.aura, fastestCheck: run.fastestCheck, checks: run.checks, bosses: run.bosses, legendary: run.legendary,
         accuracy: acc, xp, coins, areaName: area ? area.name : '', level: run.level.n, rank, total: run.total,
-        avg: run.reactN ? run.reactSum / run.reactN : 0,
+        avg: run.reactN ? run.reactSum / run.reactN : 0, day: run.day, eid: run.eid,
         comment: U.pick(D.LINES.gameover),
       };
-      const S = HHD.Store;
       const prevXp = S.data.xp;
-      summary.news = S.recordRun(summary);
+      if (zen) {
+        S.data.xp += xp; S.data.coins += coins; S.save();
+        summary.news = {};
+      } else {
+        summary.news = S.recordRun(summary);
+        Meta.add('games');
+        Meta.max('score', run.score);
+        Meta.max('aura', run.aura);
+      }
       summary.unlockedAreas = D.AREAS.filter((a) => a.xp > prevXp && a.xp <= S.data.xp).map((a) => a.name);
       if (run.maxCombo >= 75 && !S.data.owned.includes('forbidden')) {
         S.data.owned.push('forbidden');
-        S.save();
         summary.forbidden = true;
+        Meta.max('skins', S.data.owned.length);
       }
-      setTimeout(() => HHD.UI.showGameOver(summary), 1500);
+      summary.newAch = Meta.achCount() - run.achBefore;
+      summary.missionsDone = Meta.missionsDone();
+      summary.title = Meta.title(S.playerLevel().lvl);
+      S.save();
+      return summary;
     },
 
     quit() {
+      const run = this.run;
+      // Übungsmodus: Fortschritt (Lexikon/XP) trotzdem verbuchen
+      if (run && run.mode === 'zen' && !this.tutorial && run.total > 0 && this.state !== 'over') this.summary();
       this.clearTimers();
       this.state = 'idle';
       this.paused = false;
       this.tutorial = null;
+      this.call = null;
       A.music.stop();
       A.ambience.set('menu', false);
       this.el.pause.hidden = true;
       this.resetStage();
+      HHD.Store.save();
     },
 
     /* ================= PAUSE ================= */
     pause() {
-      if (this.paused || !['decide', 'check', 'feedback', 'cinematic'].includes(this.state)) return;
+      if (this.paused || !['decide', 'check', 'feedback', 'cinematic', 'call'].includes(this.state)) return;
       this.paused = true;
       this.el.pause.hidden = false;
       if (HHD.UI) HHD.UI.renderSettings();
@@ -1079,10 +1508,18 @@
       e['hud-aura'].textContent = U.fmtSigned(run.aura);
       e['hud-aura'].classList.toggle('neg', run.aura < 0);
       let hearts = '';
-      for (let i = 0; i < run.maxLives; i++) hearts += '<i class="' + (i < run.lives ? 'on' : 'off') + '">' + (i < run.lives ? '❤️' : '🖤') + '</i>';
+      if (run.mode === 'zen') hearts = '<i class="on">🧘</i><i class="on">∞</i>';
+      else for (let i = 0; i < run.maxLives; i++) hearts += '<i class="' + (i < run.lives ? 'on' : 'off') + '">' + (i < run.lives ? '❤️' : '🖤') + '</i>';
+      if (run.shield) hearts += '<i class="on shield" title="Mamas Dua">🤲</i>';
       e['hud-lives'].innerHTML = hearts;
       const area = D.AREAS.find((a) => a.id === run.level.area);
-      e['hud-level'].textContent = 'LVL ' + run.level.n + ' · ' + (area ? area.name : '');
+      let lbl = 'LVL ' + run.level.n + ' · ' + (area ? area.name : '');
+      if (run.mode === 'ramadan') lbl = '🌙 TAG ' + run.day + '/30 · LVL ' + run.level.n;
+      else if (run.mode === 'hardcore') lbl = '💀 ' + lbl;
+      else if (run.mode === 'zen') lbl = '🧘 ÜBEN · ' + lbl;
+      if (run.rush) lbl = '🌙 IFTAR RUSH · ' + Math.max(1, 8 - run.rush.left) + '/8';
+      if (run.boss) lbl = (run.boss.kind === 'terlik' ? '🩴 BOSS' : '🏪 BOSS') + ' · LVL ' + run.level.n;
+      e['hud-level'].textContent = lbl;
       const tier = run.combo >= 50 ? 4 : run.combo >= 20 ? 3 : run.combo >= 10 ? 2 : run.combo >= 5 ? 1 : 0;
       e['scr-game'].dataset.combo = tier;
       if (bump) {
@@ -1093,9 +1530,15 @@
 
     updateTimerUI(left, total) {
       const e = this.el;
+      if (!isFinite(left) || !isFinite(total)) {
+        e['hud-time'].textContent = '∞';
+        e['hud-timebar'].style.transform = 'scaleX(1)';
+        if (e['hud-timebar'].dataset.s !== 'hi') { e['hud-timebar'].dataset.s = 'hi'; e['hud-time'].dataset.s = 'hi'; }
+        return;
+      }
       const l = Math.max(0, left);
       e['hud-time'].textContent = U.fmtSec(l);
-      const frac = total === Infinity ? 1 : U.clamp(l / total, 0, 1);
+      const frac = U.clamp(l / total, 0, 1);
       e['hud-timebar'].style.transform = 'scaleX(' + frac.toFixed(3) + ')';
       const cls = frac > 0.5 ? 'hi' : frac > 0.25 ? 'mid' : 'lo';
       if (e['hud-timebar'].dataset.s !== cls) { e['hud-timebar'].dataset.s = cls; e['hud-time'].dataset.s = cls; }
@@ -1114,6 +1557,7 @@
       if (this.tutorial) return;
       if (this.state === 'decide' && this.cur && !this.cur.decided) {
         const cur = this.cur;
+        if (!isFinite(cur.time)) { this.updateTimerUI(Infinity, Infinity); return; }
         cur.left -= dt;
         this.updateTimerUI(cur.left, cur.time);
         const panic = cur.left < 0.35;
@@ -1123,11 +1567,12 @@
         if (cur.left <= 0) this.timeout();
       } else if (this.state === 'check' && this.chk) {
         const chk = this.chk;
-        chk.left -= dt;
+        const finite = isFinite(chk.total);
+        if (finite) chk.left -= dt;
         this.updateTimerUI(chk.left, chk.total);
-        this.el['ing-bar'].style.transform = 'scaleX(' + U.clamp(chk.left / chk.total, 0, 1).toFixed(3) + ')';
+        this.el['ing-bar'].style.transform = 'scaleX(' + (finite ? U.clamp(chk.left / chk.total, 0, 1) : 1).toFixed(3) + ')';
         // Auto-Scroll (bis ~65 % der Zeit ist alles einmal sichtbar gewesen)
-        if (!chk.user && chk.translated) {
+        if (!chk.user && chk.translated && finite) {
           const win = this.el['ing-window'];
           const max = win.scrollHeight - win.clientHeight;
           if (max > 2) {
@@ -1136,9 +1581,16 @@
             win.scrollTop = chk.auto;
           }
         }
-        const panic = chk.left < 0.8;
+        const panic = finite && chk.left < 0.8;
         if (panic !== this._panic) { this._panic = panic; A.music.set({ panic }); }
-        if (chk.left <= 0) this.checkTimeout();
+        if (finite && chk.left <= 0) this.checkTimeout();
+      } else if (this.state === 'call' && this.call) {
+        const c = this.call;
+        c.left -= dt;
+        this.updateTimerUI(c.left, c.total);
+        const r = Math.floor((c.total - c.left) / 0.95);
+        if (r !== c.ring) { c.ring = r; A.play('ring'); }
+        if (c.left <= 0) this.answerCall(false);
       } else if (this._panic) {
         this._panic = false;
         A.music.set({ panic: false });
@@ -1149,21 +1601,18 @@
     startTutorial(onDone) {
       this.clearTimers();
       this.gameTime = 0;
-      this.run = {
-        areaId: 'street', levelIdx: 0, level: D.LEVELS[0], lives: 3, maxLives: 3, score: 0, combo: 0, maxCombo: 0, aura: 0,
-        correct: 0, wrong: 0, total: 0, checks: 0, fastest: 0, fastestCheck: 0, reactSum: 0, reactN: 0, itemsInLevel: 0,
-        wrongStreak: 0, overchecks: [], boss: null, bossesDone: {}, bosses: 0, legendary: 0, queue: [], recent: [], lastTpl: null, heat: 0,
-      };
+      this.run = this.newRun(D.AREAS[0], 'normal');
+      this.run.maxLives = 3;
       this.tutorial = { step: 0, onDone };
       this.renderDetector();
       this.resetStage();
+      W.setTheme(null);
       W.setArea('street');
       W.setIntensity(1);
-      A.music.set({ mode: 'game', level: 1, combo: 0, boss: false, panic: false });
+      A.music.set({ mode: 'game', level: 1, combo: 0, boss: false, panic: false, rush: false, slow: false, style: 'arcade' });
       A.music.start('game');
       this.hud();
-      this.updateTimerUI(0, Infinity);
-      this.el['hud-time'].textContent = '∞';
+      this.updateTimerUI(Infinity, Infinity);
       this.state = 'cinematic';
       FX.showBanner('TUTORIAL', 'Der Döner-Meister erklärt.', 'level', 1100);
       this.after(1.1, () => this.tutorialStep());
@@ -1185,6 +1634,7 @@
       inst.time = Infinity; inst.left = Infinity; inst.shownAt = this.gameTime; inst.decided = false;
       if (inst.variant) inst.variant = { verdict: 'haram', list: [{ text: 'Glukosesirup', flag: false }, { text: 'Zucker', flag: false }, { text: 'Gelatine (Schwein)', flag: true }, { text: 'Säuerungsmittel: Citronensäure', flag: false }, { text: 'Fruchtsaftkonzentrat', flag: false }], note: null };
       this.cur = inst;
+      Meta.see(inst.id);
       const el = Art.makeItemEl(inst, 'enter');
       inst.el = el;
       this.el['item-slot'].appendChild(el);
@@ -1233,8 +1683,7 @@
         this.openCheck(0);
         this.el['ing-sub'].textContent = 'LIES DIE ZUTATEN. Tippe auf das Problem – oder drücke ❌ HARAM.';
         this.tutHint('Finde das Problem in der Liste!', 'haram');
-        this.updateTimerUI(0, Infinity);
-        this.el['hud-time'].textContent = '∞';
+        this.updateTimerUI(Infinity, Infinity);
         return;
       }
       this.state = 'feedback';

@@ -10,6 +10,7 @@
     sunset: ['#6a4bc4', '#ff8a65', '#ffd59b'],
     night: ['#070a26', '#1e1850', '#43307a'],
     apocalypse: ['#1a0526', '#7a1446', '#ff6a2b'],
+    ramadan: ['#050b22', '#13265a', '#3a2c74'],
     indoor: ['#f6efe0', '#efe6d2', '#e7dcc4'],
   };
   const SHOP_COLORS = ['#ff6b6b', '#4ecdc4', '#ffd166', '#8e7dff', '#06d6a0', '#ff9f1c', '#ef476f', '#3a86ff', '#f78c6b', '#9bde7e'];
@@ -27,6 +28,7 @@
     walkers: [], bus: null, flyers: [], lanterns: false,
     speed: 26, intensity: 1, reduce: false,
     scan: 0, overview: 0, overviewTarget: 0, overheat: 0,
+    theme: null, rush: false, fanous: false, lanternSprites: [], ramadanSign: null,
     groundY: 0,
 
     init(canvas) {
@@ -49,9 +51,18 @@
     setArea(areaId) {
       const a = HHD.DATA.AREAS.find((x) => x.id === areaId) || HHD.DATA.AREAS[0];
       if (this.area === a) return;
-      this.area = a; this.scene = a.scene; this.time = a.time;
+      this.area = a; this.scene = a.scene;
+      this.time = this.theme === 'ramadan' ? 'ramadan' : a.time;
       this.build();
     },
+
+    /** Ramadan-Theme: jede Gegend wird nachts mit Laternen und Mondsichel dargestellt */
+    setTheme(theme) {
+      if (this.theme === theme) return;
+      this.theme = theme;
+      if (this.area) { this.time = theme === 'ramadan' ? 'ramadan' : this.area.time; this.build(); }
+    },
+    setRush(on) { this.rush = !!on; },
 
     setIntensity(level) { this.intensity = level; this.speed = 22 + level * 9; },
 
@@ -87,7 +98,7 @@
         if (a.id === 'airport') this.sprites.splice(2, 0, this.makeBoard(shopH * 0.9));
       }
       this.stars = [];
-      if (this.time === 'night' || this.time === 'apocalypse') {
+      if (this.time === 'night' || this.time === 'apocalypse' || this.time === 'ramadan') {
         for (let i = 0; i < 70; i++) this.stars.push({ x: Math.random(), y: Math.random() * 0.55, r: Math.random() * 1.6 + 0.3, p: Math.random() * 6 });
       }
       this.clouds = [];
@@ -95,6 +106,11 @@
         for (let i = 0; i < 5; i++) this.clouds.push({ x: Math.random() * this.w, y: U.rand(0.06, 0.32) * H, s: U.rand(0.6, 1.3), v: U.rand(4, 10) });
       }
       this.lanterns = this.time === 'night';
+      this.fanous = this.time === 'ramadan';
+      if (this.fanous) {
+        this.lanternSprites = ['#ff4d6d', '#3dd6d0', '#ffd166', '#8e7dff', '#06d6a0'].map((c) => this.makeLantern(c));
+        this.ramadanSign = this.makeRamadanSign();
+      }
       // Laufende NPCs
       this.walkers = [];
       const n = this.reduce ? 3 : this.w > 900 ? 9 : 6;
@@ -120,9 +136,9 @@
     makeSkyline(H) {
       const tw = 900, th = H * 0.55;
       const { c, g } = this.canvas(tw, th);
-      const night = this.time === 'night' || this.time === 'apocalypse';
-      const base = { day: '#8fb8e8', sunset: '#8a5a9e', night: '#241d4d', apocalypse: '#3b0f33' }[this.time] || '#8fb8e8';
-      const front = { day: '#6f9fd8', sunset: '#6d4488', night: '#1a1540', apocalypse: '#2a0a26' }[this.time] || '#6f9fd8';
+      const night = this.time === 'night' || this.time === 'apocalypse' || this.time === 'ramadan';
+      const base = { day: '#8fb8e8', sunset: '#8a5a9e', night: '#241d4d', apocalypse: '#3b0f33', ramadan: '#1f2a5c' }[this.time] || '#8fb8e8';
+      const front = { day: '#6f9fd8', sunset: '#6d4488', night: '#1a1540', apocalypse: '#2a0a26', ramadan: '#151c45' }[this.time] || '#6f9fd8';
       [[base, 0.55], [front, 0.8]].forEach(([col, hm], layer) => {
         let x = 0;
         while (x < tw) {
@@ -145,7 +161,8 @@
       const { c, g } = this.canvas(tw, th);
       const airport = this.area.id === 'airport';
       const sky = g.createLinearGradient(0, 0, 0, th);
-      sky.addColorStop(0, '#7ecbff'); sky.addColorStop(1, '#d9f3ff');
+      const dark = this.time === 'ramadan';
+      sky.addColorStop(0, dark ? '#0b1640' : '#7ecbff'); sky.addColorStop(1, dark ? '#2a3a7a' : '#d9f3ff');
       g.fillStyle = '#e8e2d6'; g.fillRect(0, 0, tw, th);
       for (let i = 0; i < 3; i++) {
         const x = 20 + i * 200;
@@ -179,7 +196,7 @@
       const col = U.pick(SHOP_COLORS);
       const col2 = U.pick(SHOP_COLORS.filter((x) => x !== col));
       g.lineJoin = 'round';
-      const night = this.time === 'night' || this.time === 'apocalypse';
+      const night = this.time === 'night' || this.time === 'apocalypse' || this.time === 'ramadan';
       if (kind === 'park') {
         g.fillStyle = '#7a4b2a';
         for (let i = 0; i < 3; i++) {
@@ -450,8 +467,18 @@
       }
       if (this.scene === 'street') {
         const sunX = Wd * 0.78, sunY = gy * (this.time === 'sunset' ? 0.55 : 0.22);
-        g.fillStyle = this.time === 'night' ? '#fff6d5' : this.time === 'apocalypse' ? '#ff3b3b' : '#ffe066';
-        g.beginPath(); g.arc(sunX, sunY, Math.min(60, Wd * 0.06 + 20), 0, 7); g.fill();
+        const R = Math.min(60, Wd * 0.06 + 20);
+        if (this.time === 'ramadan') {
+          const glow = g.createRadialGradient(sunX, sunY, R * 0.4, sunX, sunY, R * 2.6);
+          glow.addColorStop(0, 'rgba(255,236,170,0.35)'); glow.addColorStop(1, 'rgba(255,236,170,0)');
+          g.fillStyle = glow; g.fillRect(sunX - R * 3, sunY - R * 3, R * 6, R * 6);
+          g.fillStyle = '#fff1b8'; g.beginPath(); g.arc(sunX, sunY, R, 0, 7); g.fill();
+          g.fillStyle = this.skyGrad; g.beginPath(); g.arc(sunX + R * 0.42, sunY - R * 0.22, R * 0.86, 0, 7); g.fill();
+          g.fillStyle = '#fff1b8'; this.star(g, sunX - R * 0.1, sunY - R * 0.05, R * 0.2);
+        } else {
+          g.fillStyle = this.time === 'night' ? '#fff6d5' : this.time === 'apocalypse' ? '#ff3b3b' : '#ffe066';
+          g.beginPath(); g.arc(sunX, sunY, R, 0, 7); g.fill();
+        }
         for (const c of this.clouds) {
           c.x += c.v * dt * (moving ? 1 : 0);
           if (c.x > Wd + 120) c.x = -120;
@@ -484,11 +511,15 @@
           g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
         }
       }
+      if (this.fanous) this.drawFanous();
+      if (this.rush && !this.reduce && Math.random() < dt * 7) {
+        this.flyers.push({ x: Math.random() * Wd, y: -30, vx: U.rand(-20, 20), vy: U.rand(120, 220), r: 0, vr: U.rand(-2, 2), e: U.pick(['🌙', '⭐', '✨', '🌟']), s: U.rand(20, 34), fall: true });
+      }
       // Fliegende Pakete (hinten)
       for (let i = this.flyers.length - 1; i >= 0; i--) {
         const f = this.flyers[i];
         f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt;
-        if (f.x < -80 || f.x > Wd + 80) { this.flyers.splice(i, 1); continue; }
+        if (f.x < -80 || f.x > Wd + 80 || f.y > Hd + 60) { this.flyers.splice(i, 1); continue; }
         g.save(); g.translate(f.x, f.y); g.rotate(f.r); g.font = f.s + 'px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(f.e, 0, 0); g.restore();
       }
       // Läden
@@ -503,12 +534,12 @@
       // Boden
       if (this.scene === 'street') {
         const sideH = Hd * 0.07;
-        g.fillStyle = this.time === 'night' ? '#4b4470' : this.time === 'apocalypse' ? '#4a2336' : '#cfc8dc';
+        g.fillStyle = this.time === 'night' || this.time === 'ramadan' ? '#4b4470' : this.time === 'apocalypse' ? '#4a2336' : '#cfc8dc';
         g.fillRect(0, gy, Wd, sideH);
         g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 2;
         for (let x = -(this.x % 60); x < Wd; x += 60) { g.beginPath(); g.moveTo(x, gy); g.lineTo(x - 20, gy + sideH); g.stroke(); }
         g.fillStyle = '#8e8aa3'; g.fillRect(0, gy + sideH, Wd, 6);
-        g.fillStyle = this.time === 'night' ? '#241f3d' : this.time === 'apocalypse' ? '#2a1020' : '#3d3a4b';
+        g.fillStyle = this.time === 'night' || this.time === 'ramadan' ? '#241f3d' : this.time === 'apocalypse' ? '#2a1020' : '#3d3a4b';
         g.fillRect(0, gy + sideH + 6, Wd, Hd - gy - sideH - 6);
         g.fillStyle = '#ffe066';
         const ly = gy + sideH + (Hd - gy - sideH) * 0.45;
@@ -544,6 +575,105 @@
       }
       if (this.scan) this.drawScan();
       if (this.overview > 0.01) this.drawOverview();
+    },
+
+    /* ---------- Ramadan-Deko ---------- */
+    star(g, x, y, r) {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rr = i % 2 ? r * 0.45 : r;
+        g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      g.closePath(); g.fill();
+    },
+
+    /** Fanous-Laterne als wiederverwendetes Sprite */
+    makeLantern(col) {
+      const w = 34, h = 64;
+      const { c, g } = this.canvas(w + 24, h + 24);
+      const ox = 12, oy = 12;
+      const glow = g.createRadialGradient(ox + w / 2, oy + h * 0.55, 2, ox + w / 2, oy + h * 0.55, 30);
+      glow.addColorStop(0, 'rgba(255,220,140,0.55)'); glow.addColorStop(1, 'rgba(255,220,140,0)');
+      g.fillStyle = glow; g.fillRect(0, 0, w + 24, h + 24);
+      g.translate(ox, oy);
+      g.lineJoin = 'round';
+      g.strokeStyle = OUT; g.lineWidth = 2;
+      // Ring & Kappe
+      g.strokeStyle = '#d4a017'; g.lineWidth = 2.5; g.beginPath(); g.arc(w / 2, 4, 3.5, 0, 7); g.stroke();
+      g.fillStyle = '#d4a017'; g.strokeStyle = OUT; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(w * 0.22, 18); g.quadraticCurveTo(w / 2, 2, w * 0.78, 18); g.closePath(); g.fill(); g.stroke();
+      // Glas-Körper
+      g.beginPath();
+      g.moveTo(w * 0.22, 18); g.lineTo(w * 0.78, 18); g.lineTo(w, h * 0.5); g.lineTo(w * 0.72, h - 12); g.lineTo(w * 0.28, h - 12); g.lineTo(0, h * 0.5); g.closePath();
+      g.fillStyle = col; g.globalAlpha = 0.9; g.fill(); g.globalAlpha = 1;
+      g.fillStyle = 'rgba(255,255,220,0.55)';
+      g.beginPath(); g.moveTo(w * 0.36, 22); g.lineTo(w * 0.5, 22); g.lineTo(w * 0.46, h - 16); g.lineTo(w * 0.4, h - 16); g.closePath(); g.fill();
+      g.strokeStyle = '#d4a017'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(w * 0.5, 18); g.lineTo(w * 0.5, h - 12); g.moveTo(w * 0.22, 18); g.lineTo(w * 0.28, h - 12); g.moveTo(w * 0.78, 18); g.lineTo(w * 0.72, h - 12); g.moveTo(0, h * 0.5); g.lineTo(w, h * 0.5); g.stroke();
+      g.strokeStyle = OUT; g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(w * 0.22, 18); g.lineTo(w * 0.78, 18); g.lineTo(w, h * 0.5); g.lineTo(w * 0.72, h - 12); g.lineTo(w * 0.28, h - 12); g.lineTo(0, h * 0.5); g.closePath(); g.stroke();
+      // Boden & Spitze
+      g.fillStyle = '#d4a017';
+      g.beginPath(); g.moveTo(w * 0.28, h - 12); g.lineTo(w * 0.72, h - 12); g.lineTo(w * 0.5, h - 2); g.closePath(); g.fill(); g.stroke();
+      return { c, w: w + 24, h: h + 24 };
+    },
+
+    makeRamadanSign() {
+      const w = 250, h = 52;
+      const { c, g } = this.canvas(w, h + 16);
+      g.strokeStyle = '#d4a017'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(24, 0); g.lineTo(34, 16); g.moveTo(w - 24, 0); g.lineTo(w - 34, 16); g.stroke();
+      g.fillStyle = '#0f5132'; g.strokeStyle = OUT; g.lineWidth = 3;
+      roundRect(g, 4, 14, w - 8, h - 2, 10); g.fill(); g.stroke();
+      g.strokeStyle = '#d4a017'; g.lineWidth = 2; roundRect(g, 10, 20, w - 20, h - 14, 7); g.stroke();
+      g.fillStyle = '#ffd166'; g.font = "22px 'Lilita One', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('RAMADAN KAREEM', w / 2 + 8, 14 + h / 2);
+      g.font = '20px serif'; g.fillText('🌙', 26, 14 + h / 2);
+      return { c, w, h: h + 16 };
+    },
+
+    drawFanous() {
+      const g = this.g, Wd = this.w, gy = this.groundY;
+      const y0 = Math.max(18, gy * 0.1);
+      // Leine
+      g.strokeStyle = 'rgba(212,160,23,0.85)'; g.lineWidth = 2;
+      g.beginPath();
+      for (let x = 0; x <= Wd; x += 20) {
+        const yy = y0 + Math.abs(Math.sin((x / Wd) * Math.PI * 3)) * 26;
+        if (x === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+      }
+      g.stroke();
+      // Lichterkette
+      for (let x = 10, i = 0; x < Wd; x += 26, i++) {
+        const yy = y0 + Math.abs(Math.sin((x / Wd) * Math.PI * 3)) * 26 + 3;
+        g.fillStyle = (i + Math.floor(this.t * 3)) % 3 ? 'rgba(255,230,150,0.95)' : 'rgba(255,255,255,0.35)';
+        g.beginPath(); g.arc(x, yy, 2.4, 0, 7); g.fill();
+      }
+      // Laternen
+      const n = Math.max(3, Math.floor(Wd / 130));
+      for (let i = 0; i < n; i++) {
+        const x = ((i + 0.5) / n) * Wd;
+        const yy = y0 + Math.abs(Math.sin((x / Wd) * Math.PI * 3)) * 26;
+        const sp = this.lanternSprites[i % this.lanternSprites.length];
+        if (!sp) continue;
+        g.save();
+        g.translate(x, yy);
+        g.rotate(this.reduce ? 0 : Math.sin(this.t * 1.6 + i) * 0.08);
+        g.drawImage(sp.c, -sp.w / 2, -8, sp.w, sp.h);
+        g.restore();
+      }
+      // Banner in der Mitte (nur draußen)
+      if (this.ramadanSign && this.scene === 'street') {
+        const s = this.ramadanSign;
+        const sw = Math.min(s.w, Wd * 0.6), sh = s.h * (sw / s.w);
+        g.save();
+        g.translate(Wd / 2, y0 + 30);
+        g.rotate(this.reduce ? 0 : Math.sin(this.t * 1.1) * 0.02);
+        g.drawImage(s.c, -sw / 2, 0, sw, sh);
+        g.restore();
+      }
     },
 
     cloud(x, y, s) {

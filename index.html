@@ -22,7 +22,7 @@
     <section class="screen menu-screen" id="scr-start" aria-label="Startbildschirm">
       <div class="start-top">
         <div class="pill coins" title="Detector-Coins">🪙 <b id="st-coins">0</b></div>
-        <div class="pill plevel" title="Spieler-Level">⭐ LVL <b id="st-plevel">1</b><span class="xpbar"><i id="st-xpbar"></i></span></div>
+        <div class="pill plevel" title="Spieler-Level und Rang">⭐ LVL <b id="st-plevel">1</b> <span class="ptitle" id="st-title">MINI-AKHI</span><span class="xpbar"><i id="st-xpbar"></i></span></div>
       </div>
 
       <h1 class="logo" aria-label="Halal Haram Detector">
@@ -44,6 +44,10 @@
           <button class="btn c-board" data-action="leaderboard">🏆 LEADERBOARD</button>
         </div>
         <div class="menu-row">
+          <button class="btn c-lex" data-action="lexikon">📖 LEXIKON <span class="nbadge" id="st-lex">0%</span></button>
+          <button class="btn c-mis" data-action="missions">🏅 AUFGABEN <span class="nbadge" id="st-missions">0/3</span></button>
+        </div>
+        <div class="menu-row">
           <button class="btn c-set" data-action="settings">⚙️ SETTINGS</button>
           <button class="btn c-duel" data-action="duel">⚔️ DUELL 2P</button>
         </div>
@@ -61,6 +65,8 @@
         <h2>🗺️ STADTKARTE</h2>
         <span class="pill" id="map-xp">0 XP</span>
       </header>
+      <div class="modes" id="map-modes" role="group" aria-label="Spielmodus"></div>
+      <p class="mode-desc" id="map-mode-desc"></p>
       <p class="hint">XP aus jeder Runde schalten neue Stadtbereiche frei. Höhere Bereiche starten schneller – und geben mehr Punkte.</p>
       <div class="area-list" id="map-list"></div>
     </section>
@@ -81,7 +87,7 @@
         </div>
         <div class="timebar"><i id="hud-timebar"></i></div>
         <div class="boss-hud" id="boss-hud" hidden>
-          <span>🏪 BOSS</span>
+          <span id="boss-name">🏪 BOSS</span>
           <div class="boss-bar"><i id="boss-hp"></i></div>
           <b id="boss-hp-text">100%</b>
         </div>
@@ -104,9 +110,24 @@
             <div class="boss-eyes"><i></i><i></i></div>
             <div class="boss-mouth"></div>
           </div>
+          <div class="terlik-body">
+            <span class="tb-emo">🩴</span>
+            <div class="boss-eyes"><i></i><i></i></div>
+            <span class="tb-tag">MAMAS TERLIK</span>
+          </div>
           <div class="boss-say" id="boss-say"></div>
         </div>
         <div class="disrupt" id="disrupt" aria-hidden="true"></div>
+        <div class="pu-bar" id="pu-bar" hidden></div>
+        <div class="xray-hint" id="xray-hint" hidden></div>
+        <div class="call" id="call" hidden>
+          <div class="call-card">
+            <div class="call-avatar">🧕🏽</div>
+            <div class="call-who">MAMA ❤️</div>
+            <div class="call-text" id="call-text">MAMA RUFT AN…</div>
+            <div class="call-hint">📞 ANNEHMEN · 📵 WEGDRÜCKEN</div>
+          </div>
+        </div>
         <div class="bubbles" id="bubbles" aria-hidden="true"></div>
         <div class="meme" id="meme" aria-live="polite"></div>
         <div class="tut-hint" id="tut-hint" hidden></div>
@@ -181,8 +202,44 @@
         <h2>🛒 SHOP</h2>
         <span class="pill">🪙 <b id="shop-coins">0</b></span>
       </header>
-      <p class="hint">Kosmetische Detector-Skins. Kein Pay-to-Win – nur Pay-to-Piep. Coins gibt’s für jede Runde.</p>
+      <h3 class="sec-title">⚡ POWER-UPS</h3>
+      <div class="pu-list" id="shop-pu"></div>
+      <h3 class="sec-title">🎨 DETECTOR-SKINS</h3>
+      <p class="hint">Kosmetisch. Kein Pay-to-Win – nur Pay-to-Piep. Coins gibt’s für jede Runde, jede Aufgabe und jeden Erfolg.</p>
       <div class="skin-list" id="shop-list"></div>
+    </section>
+
+    <!-- ===================== LEXIKON ===================== -->
+    <section class="screen menu-screen" id="scr-lexikon" aria-label="Lexikon">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>📖 LEXIKON</h2>
+        <span class="pill" id="lex-count">0 / 0</span>
+      </header>
+      <div class="lex-progress"><i id="lex-bar"></i></div>
+      <p class="hint">Jedes Produkt, das dir im Spiel begegnet, landet hier – mit Erklärung. Tippe auf eine Karte.</p>
+      <div class="tabs" id="lex-filters"></div>
+      <div class="lex-grid" id="lex-grid"></div>
+      <div class="lex-modal" id="lex-modal" hidden>
+        <div class="lex-card">
+          <button class="icon-btn lex-x" data-action="lex-close" aria-label="Schließen">✕</button>
+          <div id="lex-detail"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== AUFGABEN & ERFOLGE ===================== -->
+    <section class="screen menu-screen" id="scr-missions" aria-label="Aufgaben und Erfolge">
+      <header class="scr-head">
+        <button class="btn small ghost" data-action="back" aria-label="Zurück">←<span class="back-txt"> ZURÜCK</span></button>
+        <h2>🏅 AUFGABEN</h2>
+        <span class="pill" id="ach-count">0 / 0</span>
+      </header>
+      <h3 class="sec-title">📅 TAGESAUFGABEN</h3>
+      <p class="hint small">Jeden Tag drei neue. Belohnung gibt’s sofort.</p>
+      <ul class="mis-list" id="mis-list"></ul>
+      <h3 class="sec-title">🏅 ERFOLGE</h3>
+      <div class="ach-grid" id="ach-grid"></div>
     </section>
 
     <!-- ===================== RANGLISTE ===================== -->
@@ -214,6 +271,14 @@
         <span>🔊 Lautstärke</span>
         <input id="set-volume" type="range" min="0" max="100" step="1">
       </label>
+      <div class="field">
+        <span>🥁 Musikstil</span>
+        <div class="seg" role="group" aria-label="Musikstil">
+          <button type="button" class="seg-btn" data-action="music-style" data-style="auto">AUTO</button>
+          <button type="button" class="seg-btn" data-action="music-style" data-style="orient">🥁 ORIENT</button>
+          <button type="button" class="seg-btn" data-action="music-style" data-style="arcade">🕹️ ARCADE</button>
+        </div>
+      </div>
       <div class="toggles">
         <button class="toggle" data-action="toggle" data-key="music">🎵 Musik</button>
         <button class="toggle" data-action="toggle" data-key="sfx">🔊 Soundeffekte</button>
@@ -244,6 +309,12 @@
       <div class="rule r-check"><b>🔎 INGREDIENTS</b><p>Alles, was man am Bild nicht sicher erkennt: Süßigkeiten, Fertiggerichte, Soßen, Fleischgerichte ohne Siegel, Import-Snacks … <em>Nicht raten – checken!</em></p></div>
       <div class="rule"><b>📜 Zutaten-Minispiel</b><p>Tippe auf das Problem (z. B. <em>Gelatine (Schwein)</em>, <em>Rum</em>) – oder entscheide ✅ HALAL, wenn alles passt. Harmlose Zutaten antippen kostet Zeit.</p></div>
       <div class="rule"><b>⚡ Tempo</b><p>Jede Runde wird schneller. Richtige Serien bauen Combo &amp; Aura auf. Fehler kosten ❤️ – drei Fehler am Stück kosten richtig Aura. 💀</p></div>
+      <div class="rule"><b>🎮 Modi</b><p>🔎 <em>Normal</em> · 🌙 <em>Ramadan</em>: nachts unter Laternen, nach jedem Level ein Iftar Rush, nach 30 Tagen Eid mit Bayram-Geld · 💀 <em>Hardcore</em>: ein Leben, doppelte Punkte · 🧘 <em>Üben</em>: ohne Zeit und ohne Leben.</p></div>
+      <div class="rule"><b>🌙 Iftar Rush</b><p>8 Iftar-Gerichte in Rekordzeit, alles zählt doppelt. Ohne Fehler gibt’s ein Power-up. Achtung: Auch aufs Buffet schummelt sich mal ein Rakı.</p></div>
+      <div class="rule"><b>📞 Mama ruft an</b><p>✅ = annehmen (+Aura) · ❌ = wegdrücken … dann fliegt der Terlik. 🩴 Drei Fehler hintereinander übrigens auch.</p></div>
+      <div class="rule"><b>🚨 Halal-Polizei</b><p>Die selbsternannte Halal-Polizei ruft bei allem „HARAM!“ – auch bei Bananen. Nicht nachplappern, selbst prüfen.</p></div>
+      <div class="rule"><b>⚡ Power-ups</b><p>🔍 Röntgen-Blick zeigt die Antwort · ⏳ Zeitlupe gibt mehr Zeit · 🤲 Mamas Dua fängt einen Fehler ab. Antippen oder Tasten <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>.</p></div>
+      <div class="rule"><b>👹 Bosse</b><p>Nach Level 3: <em>Der Supermarkt</em>. Nach Level 6: <em>Mamas Terlik</em>. In Level 7 kommen sie immer wieder.</p></div>
       <div class="rule"><b>⌨️ Steuerung</b><p>Buttons antippen · Tastatur: <kbd>←</kbd>/<kbd>A</kbd> HALAL · <kbd>↓</kbd>/<kbd>S</kbd>/<kbd>Leertaste</kbd> INGREDIENTS · <kbd>→</kbd>/<kbd>D</kbd> HARAM · <kbd>Esc</kbd> Pause. Optional: Swipe-Steuerung in den Settings.</p></div>
       <div class="rule note"><b>ℹ️ Wichtig</b><p>Das Spiel ist Unterhaltung und <strong>kein religiöses Rechtsgutachten</strong>. Die Spiel-Logik bewertet nur die im Spiel angezeigten Angaben. Im echten Leben: echte Zutatenliste lesen und bei Unsicherheit fachkundige Stellen fragen.</p></div>
     </section>
@@ -287,16 +358,19 @@
   <canvas id="fx-canvas" aria-hidden="true"></canvas>
   <div id="flash" aria-hidden="true"></div>
   <div id="toast" role="status" aria-live="polite"></div>
+  <div id="ach-pop" role="status" aria-live="polite"></div>
 
   <noscript><div class="noscript">Bruder… JavaScript ist aus. Der Detector braucht JavaScript. 🔎</div></noscript>
 
   <script src="js/util.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/data2.js"></script>
   <script src="js/store.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/art.js"></script>
   <script src="js/world.js"></script>
   <script src="js/fx.js"></script>
+  <script src="js/meta.js"></script>
   <script src="js/game.js"></script>
   <script src="js/duel.js"></script>
   <script src="js/ui.js"></script>

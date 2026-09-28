@@ -1,9 +1,9 @@
 /* Halal Haram Detector – Service Worker (offline spielbar, Stale-While-Revalidate) */
-const CACHE = 'hhd-v1';
+const CACHE = 'hhd-v2';
 const ASSETS = [
   './', './index.html', './css/style.css', './manifest.webmanifest',
-  './js/util.js', './js/data.js', './js/store.js', './js/audio.js', './js/art.js', './js/world.js',
-  './js/fx.js', './js/game.js', './js/duel.js', './js/ui.js', './js/main.js',
+  './js/util.js', './js/data.js', './js/data2.js', './js/store.js', './js/audio.js', './js/art.js', './js/world.js',
+  './js/fx.js', './js/meta.js', './js/game.js', './js/duel.js', './js/ui.js', './js/main.js',
   './assets/icon.svg', './assets/icon-192.png', './assets/icon-512.png',
   './assets/fonts/lilita-one-latin.woff2', './assets/fonts/nunito-latin.woff2',
 ];

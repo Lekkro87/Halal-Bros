@@ -62,6 +62,55 @@
       }
     },
 
+    /** Emoji-Regen von oben (Iftar Rush, Eid, Mashallah) */
+    emojiRain(list, n) {
+      const count = this.reduceMotion ? Math.ceil((n || 40) / 4) : n || 40;
+      for (let i = 0; i < count; i++) {
+        const p = parts.find((q) => !q.on);
+        if (!p) return;
+        p.on = true; p.x = Math.random() * this.w; p.y = -30 - Math.random() * 260;
+        p.vx = U.rand(-30, 30); p.vy = U.rand(90, 200); p.g = 40; p.life = p.max = U.rand(2.4, 3.6);
+        p.s = U.rand(6, 11); p.c = '#fff'; p.r = 0; p.vr = 0; p.shape = 'rect'; p.text = U.pick(list);
+      }
+    },
+
+    /** Mamas Terlik fliegt ins Bild – KLATSCH! */
+    terlik(light) {
+      if (!this.terlikEl) {
+        this.terlikEl = document.createElement('div');
+        this.terlikEl.className = 'terlik-fly';
+        this.terlikEl.setAttribute('aria-hidden', 'true');
+        this.terlikEl.textContent = '🩴';
+        this.klatschEl = document.createElement('div');
+        this.klatschEl.className = 'klatsch';
+        this.klatschEl.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(this.terlikEl);
+        document.body.appendChild(this.klatschEl);
+      }
+      const t = this.terlikEl, k = this.klatschEl;
+      t.classList.toggle('light', !!light);
+      U.restartAnim(t, 'go');
+      clearTimeout(this._kt);
+      this._kt = setTimeout(() => {
+        k.textContent = U.pick(light ? ['KLATSCH!', 'PATSCH!'] : ['KLATSCH!', 'BAM!', 'TERLIK!', 'KLATSCH!!']);
+        k.classList.toggle('light', !!light);
+        U.restartAnim(k, 'go');
+        if (!light) this.shake('big');
+      }, 420);
+    },
+
+    /** Bildschirm-Riss bei großen Fehlern */
+    crack() {
+      if (this.reduceFx) return;
+      if (!this.crackEl) {
+        this.crackEl = document.createElement('div');
+        this.crackEl.className = 'crack';
+        this.crackEl.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(this.crackEl);
+      }
+      U.restartAnim(this.crackEl, 'on');
+    },
+
     frame(dt) {
       const g = this.g;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);

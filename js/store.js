@@ -12,6 +12,7 @@
     owned: ['default'],
     skin: 'default',
     area: 'street',
+    mode: 'normal',
     tutorialDone: false,
     eggFound: false,
     settings: {
@@ -23,12 +24,21 @@
       reduceFx: false,
       bigButtons: false,
       patterns: false,
+      musicStyle: 'auto',
     },
     bests: { score: 0, combo: 0, fastest: 0, correct: 0, aura: 0, fastestCheck: 0 },
     daily: { date: '', score: 0 },
     boards: {},
     stats: { games: 0, correct: 0, wrong: 0, checks: 0, bosses: 0, legendary: 0, maxCombo: 0 },
+    // 2.0
+    pu: { xray: 1, slowmo: 1, dua: 1 },
+    seen: {},
+    st2: {},
+    ach: {},
+    missions: { date: '', list: [] },
+    bonusDate: '',
   });
+  const DYNAMIC = ['boards', 'seen', 'st2', 'ach'];
 
   function merge(base, saved) {
     if (!saved || typeof saved !== 'object') return base;
@@ -42,8 +52,10 @@
         base[k] = s;
       }
     }
-    // Leaderboards frei übernehmen (dynamische Keys)
-    if (saved.boards && typeof saved.boards === 'object') base.boards = saved.boards;
+    // Maps mit dynamischen Keys (Ranglisten, Lexikon, Statistiken, Erfolge) komplett übernehmen
+    for (const k of DYNAMIC) {
+      if (saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k])) base[k] = saved[k];
+    }
     return base;
   }
 

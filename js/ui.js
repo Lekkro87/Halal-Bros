@@ -32,30 +32,41 @@
       this.bindKeys();
       this.bindSwipe();
       document.getElementById('start-det').addEventListener('click', () => this.easterEgg());
+      HHD.Meta.init();
+      const lexModal = document.getElementById('lex-modal');
+      lexModal.addEventListener('click', (ev) => { if (ev.target === lexModal) lexModal.hidden = true; });
       this.applySettings();
       this.refreshStart();
       this.show('start');
+      // Tagesbonus: Harçlık vom Onkel
+      const bonus = HHD.Meta.dailyBonus();
+      if (bonus) setTimeout(() => { FX.toast('🎁 HARÇLIK VOM ONKEL: +' + bonus + ' 🪙 (Tagesbonus)', 2600); this.refreshStart(); }, 900);
     },
+
+    menuStyle() { return (S.settings.musicStyle || 'auto') === 'arcade' ? 'arcade' : 'orient'; },
 
     /* ---------- Screens ---------- */
     show(name) {
       this.screen = name;
       document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === 'scr-' + name));
       document.body.dataset.screen = name;
-      const menu = ['start', 'map', 'shop', 'board', 'settings', 'help', 'over'].includes(name);
+      const menu = ['start', 'map', 'shop', 'board', 'settings', 'help', 'over', 'lexikon', 'missions'].includes(name);
       if (menu) {
+        HHD.World.setTheme(S.data.mode === 'ramadan' ? 'ramadan' : null);
         HHD.World.setArea(name === 'over' && G.run ? G.run.level.area : S.data.area || 'street');
         HHD.World.setIntensity(1);
         HHD.World.setScan(false);
         HHD.World.setOverview(false);
         HHD.World.overheat = 0;
-        if (name !== 'over') { A.music.set({ mode: 'menu', boss: false, panic: false, combo: 0 }); A.music.start('menu'); }
+        if (name !== 'over') { A.music.set({ mode: 'menu', boss: false, panic: false, combo: 0, rush: false, slow: false, style: this.menuStyle() }); A.music.start('menu'); }
       }
       if (name === 'start') this.refreshStart();
       if (name === 'map') this.renderMap();
       if (name === 'shop') this.renderShop();
       if (name === 'board') this.renderBoard();
       if (name === 'settings') this.renderSettings();
+      if (name === 'lexikon') this.renderLexikon();
+      if (name === 'missions') this.renderMissions();
       const scr = document.getElementById('scr-' + name);
       if (scr) scr.scrollTop = 0;
     },
@@ -86,6 +97,14 @@
         case 'reset': return this.resetProgress(el);
         case 'share': return this.share();
         case 'pause-toggle': return this.toggle(el.dataset.key, true);
+        case 'lexikon': return this.show('lexikon');
+        case 'missions': return this.show('missions');
+        case 'mode': return this.setMode(el.dataset.mode);
+        case 'lex-filter': this.lexFilter = el.dataset.f; return this.renderLexikon();
+        case 'lex-item': return this.showLexDetail(el.dataset.id);
+        case 'lex-close': document.getElementById('lex-modal').hidden = true; return;
+        case 'buy-pu': return this.buyPowerup(el.dataset.pu);
+        case 'music-style': return this.setMusicStyle(el.dataset.style);
       }
     },
 
@@ -97,13 +116,11 @@
         G.startTutorial(() => {
           S.data.tutorialDone = true;
           S.save();
-          G.start('street');
+          G.start('street', 'normal');
         });
         return;
       }
-      const unlocked = D.AREAS.filter((a) => S.areaUnlocked(a));
-      if (unlocked.length > 1) return this.show('map');
-      this.startArea('street');
+      this.show('map');
     },
 
     startArea(id) {
@@ -113,7 +130,22 @@
       S.save();
       A.music.stop();
       this.show('game');
-      G.start(id);
+      G.start(id, S.data.mode || 'normal');
+    },
+
+    setMode(mode) {
+      if (!D.MODES[mode]) return;
+      S.data.mode = mode;
+      S.save();
+      HHD.World.setTheme(mode === 'ramadan' ? 'ramadan' : null);
+      A.play('beep');
+      this.renderMap();
+    },
+    setMusicStyle(style) {
+      S.settings.musicStyle = style;
+      S.save();
+      A.music.set({ style: this.menuStyle() });
+      this.renderSettings();
     },
 
     /* ---------- Startbildschirm ---------- */
@@ -122,6 +154,12 @@
       const pl = S.playerLevel();
       document.getElementById('st-coins').textContent = U.fmt(d.coins);
       document.getElementById('st-plevel').textContent = pl.lvl;
+      document.getElementById('st-title').textContent = HHD.Meta.title(pl.lvl);
+      const done = HHD.Meta.missionsDone();
+      const mEl = document.getElementById('st-missions');
+      mEl.textContent = done + '/3';
+      mEl.classList.toggle('all', done === 3);
+      document.getElementById('st-lex').textContent = HHD.Meta.lexPct() + '%';
       document.getElementById('st-xpbar').style.transform = 'scaleX(' + (pl.into / pl.need).toFixed(3) + ')';
       document.getElementById('st-best').textContent = U.fmt(d.bests.score);
       document.getElementById('st-daily').textContent = U.fmt(d.daily.date === U.today() ? d.daily.score : 0);
@@ -177,7 +215,12 @@
     /* ---------- Stadtkarte ---------- */
     renderMap() {
       const xp = S.data.xp;
+      const mode = D.MODES[S.data.mode] ? S.data.mode : 'normal';
       document.getElementById('map-xp').textContent = U.fmt(xp) + ' XP';
+      document.getElementById('map-modes').innerHTML = Object.values(D.MODES).map((m) =>
+        '<button type="button" class="mode-chip m-' + m.id + (mode === m.id ? ' on' : '') + '" data-action="mode" data-mode="' + m.id + '" aria-pressed="' + (mode === m.id) + '"><span>' + m.icon + '</span>' + m.name + '</button>').join('');
+      document.getElementById('map-mode-desc').textContent = D.MODES[mode].icon + ' ' + D.MODES[mode].desc;
+      document.getElementById('scr-map').dataset.mode = mode;
       document.getElementById('map-list').innerHTML = D.AREAS.map((a) => {
         const un = S.areaUnlocked(a);
         const L = D.LEVELS[a.level - 1];
@@ -194,13 +237,18 @@
     renderShop() {
       const d = S.data;
       document.getElementById('shop-coins').textContent = U.fmt(d.coins);
+      document.getElementById('shop-pu').innerHTML = Object.keys(D.POWERUPS).map((k) => {
+        const p = D.POWERUPS[k];
+        return '<div class="pu-card"><span class="pu-ic">' + p.icon + '</span><span class="pu-txt"><b>' + U.esc(p.name) + '</b><small>' + U.esc(p.desc) + '</small><em>Im Besitz: ' + (d.pu[k] || 0) + ' · Taste ' + p.key + '</em></span>' +
+          '<button class="btn small buy' + (d.coins >= p.price ? '' : ' poor') + '" data-action="buy-pu" data-pu="' + k + '">🪙 ' + U.fmt(p.price) + '</button></div>';
+      }).join('');
       document.getElementById('shop-list').innerHTML = D.SKINS.map((s) => {
         const owned = d.owned.includes(s.id);
         const eq = d.skin === s.id;
         let btn;
         if (eq) btn = '<button class="btn small eq" disabled>✓ AUSGERÜSTET</button>';
         else if (owned) btn = '<button class="btn small" data-action="equip" data-skin="' + s.id + '">AUSRÜSTEN</button>';
-        else if (s.price == null) btn = '<button class="btn small locked" disabled>🔒 COMBO ' + s.unlockCombo + '</button>';
+        else if (s.price == null) btn = '<button class="btn small locked" disabled>🔒 ' + (s.unlockEid ? 'EID (RAMADAN)' : 'COMBO ' + s.unlockCombo) + '</button>';
         else btn = '<button class="btn small buy' + (d.coins >= s.price ? '' : ' poor') + '" data-action="buy" data-skin="' + s.id + '">🪙 ' + U.fmt(s.price) + '</button>';
         return '<div class="skin-card' + (eq ? ' eq' : '') + (s.id === 'forbidden' ? ' rare' : '') + '">' +
           '<div class="skin-prev">' + Art.detectorHTML(s.id, true) + '</div>' +
@@ -216,6 +264,7 @@
       d.owned.push(id);
       d.skin = id;
       S.save();
+      HHD.Meta.max('skins', d.owned.length);
       A.setSkinPitch(s.pitch);
       A.play('coin');
       A.play('crowd', 'cheer');
@@ -231,6 +280,78 @@
       A.setSkinPitch(s.pitch);
       A.play('beep');
       this.renderShop();
+    },
+
+    buyPowerup(k) {
+      const p = D.POWERUPS[k];
+      const d = S.data;
+      if (!p) return;
+      if (d.coins < p.price) { A.play('wrong'); FX.toast('ZU WENIG COINS, BRUDER. 🪙 ' + U.fmt(p.price - d.coins) + ' FEHLEN.'); return; }
+      d.coins -= p.price;
+      d.pu[k] = (d.pu[k] || 0) + 1;
+      S.save();
+      A.play('coin');
+      FX.toast('GEKAUFT: ' + p.icon + ' ' + p.name, 1600);
+      this.renderShop();
+    },
+
+    /* ---------- Lexikon ---------- */
+    renderLexikon() {
+      const all = HHD.Meta.lexEntries();
+      const seen = S.data.seen;
+      const f = this.lexFilter || 'all';
+      const found = all.filter((i) => seen[i.id]).length;
+      document.getElementById('lex-count').textContent = found + ' / ' + all.length;
+      document.getElementById('lex-bar').style.width = Math.round((found / all.length) * 100) + '%';
+      document.getElementById('lex-filters').innerHTML = [['all', 'ALLE'], ['halal', '✅ HALAL'], ['check', '🔎 CHECKEN'], ['haram', '❌ HARAM']].map(([k, l]) =>
+        '<button type="button" class="tab' + (f === k ? ' on' : '') + '" data-action="lex-filter" data-f="' + k + '">' + l + '</button>').join('');
+      const list = all.filter((i) => f === 'all' || i.ans === f);
+      document.getElementById('lex-grid').innerHTML = list.map((i) => {
+        const known = !!seen[i.id];
+        return '<button type="button" class="lex-tile' + (known ? ' v-' + i.ans : ' unknown') + '" data-action="lex-item" data-id="' + i.id + '">' +
+          '<span class="lx-art">' + (known ? Art.itemArt(i) : '<span class="lx-q">?</span>') + '</span>' +
+          '<span class="lx-name">' + (known ? U.esc(i.name) : '???') + '</span></button>';
+      }).join('');
+    },
+    showLexDetail(id) {
+      const i = HHD.Meta.lexEntries().find((x) => x.id === id);
+      if (!i) return;
+      if (!S.data.seen[id]) { FX.toast('Noch nicht entdeckt – spiel weiter, Akhi! 🔎'); return; }
+      const V = { halal: '✅ HALAL', haram: '❌ HARAM', check: '🔎 ZUTATEN CHECKEN' };
+      let why = i.why || (i.ans !== 'check' ? D.WHY[i.cat] : '') || '';
+      if (i.ans === 'check') {
+        const flags = new Set();
+        (i.v || []).forEach((v) => v[1].forEach((x) => { const t = Array.isArray(x) ? x[0] + ' (' + x[1] + ')' : x; if (t[0] === '!') flags.add(t.slice(1)); }));
+        if (i.id === 'doener17') flags.add('Whiskey-BBQ-Soße (mit Whiskey)');
+        why = (why ? why + ' ' : 'Unklar am Bild → Zutaten checken. ') + (flags.size ? 'Mögliche Probleme: ' + Array.from(flags).join(', ') + '. Ohne diese Zutaten: HALAL.' : '');
+      }
+      const where = (i.places || []).map((p) => D.PLACES[p]).filter(Boolean).join(', ');
+      document.getElementById('lex-detail').innerHTML =
+        '<div class="ld-art">' + Art.itemArt(i) + '</div>' +
+        '<h3>' + U.esc(i.name) + '</h3>' +
+        '<div class="ld-verdict v-' + i.ans + '">' + V[i.ans] + '</div>' +
+        '<p>' + U.esc(why) + '</p>' +
+        (where ? '<small>📍 ' + U.esc(where) + '</small>' : '') +
+        '<small>Gescannt: ' + S.data.seen[id] + '×</small>';
+      document.getElementById('lex-modal').hidden = false;
+    },
+
+    /* ---------- Aufgaben & Erfolge ---------- */
+    renderMissions() {
+      const ms = HHD.Meta.missions();
+      document.getElementById('mis-list').innerHTML = ms.map((m) => {
+        const pct = Math.round((Math.min(m.prog, m.goal) / m.goal) * 100);
+        return '<li class="mis' + (m.done ? ' done' : '') + '"><span class="mis-ic">' + (m.done ? '✅' : '📅') + '</span><span class="mis-txt"><b>' + U.esc(m.text) + '</b>' +
+          '<span class="mis-bar"><i style="width:' + pct + '%"></i></span><small>' + U.fmt(Math.min(m.prog, m.goal)) + ' / ' + U.fmt(m.goal) + '</small></span><em>+' + m.reward + ' 🪙</em></li>';
+      }).join('');
+      const st = S.data.st2, ach = S.data.ach;
+      document.getElementById('ach-count').textContent = HHD.Meta.achCount() + ' / ' + D.ACHIEVEMENTS.length;
+      document.getElementById('ach-grid').innerHTML = D.ACHIEVEMENTS.map((a) => {
+        const got = !!ach[a.id];
+        const prog = Math.min(st[a.stat] || 0, a.goal);
+        return '<div class="ach' + (got ? ' got' : '') + '"><span class="ach-ic">' + (got ? a.icon : '🔒') + '</span><b>' + U.esc(a.name) + '</b><small>' + U.esc(a.desc) + '</small>' +
+          (got ? '<em>✓ ' + U.esc(ach[a.id]) + '</em>' : '<span class="mis-bar"><i style="width:' + Math.round((prog / a.goal) * 100) + '%"></i></span><em>' + U.fmt(prog) + ' / ' + U.fmt(a.goal) + ' · +' + a.reward + ' 🪙</em>') + '</div>';
+      }).join('');
     },
 
     /* ---------- Rangliste ---------- */
@@ -262,6 +383,8 @@
         b.classList.toggle('on', on);
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
+      const style = s.musicStyle || 'auto';
+      document.querySelectorAll('[data-action="music-style"]').forEach((b) => { b.classList.toggle('on', b.dataset.style === style); b.setAttribute('aria-pressed', b.dataset.style === style ? 'true' : 'false'); });
       document.getElementById('storage-note').textContent = S.available ? 'Fortschritt wird lokal auf diesem Gerät gespeichert.' : '⚠️ Lokaler Speicher ist nicht verfügbar – Fortschritt geht beim Schließen verloren.';
     },
     toggle(key) {
@@ -324,6 +447,12 @@
       if (r.news.daily) badges.push('📅 TAGESREKORD');
       $('go-badges').innerHTML = badges.map((b) => '<span>' + b + '</span>').join('');
       let extra = '+' + U.fmt(r.xp) + ' XP · +' + U.fmt(r.coins) + ' 🪙';
+      if (r.mode && r.mode !== 'normal') {
+        const M = D.MODES[r.mode];
+        extra = M.icon + ' ' + M.name + '-MODUS' + (r.mode === 'ramadan' ? ' · TAG ' + r.day + '/30' + (r.eid ? ' · EID MUBARAK 🎉' : '') : '') + '<br>' + extra;
+      }
+      extra += '<br>⭐ RANG: ' + U.esc(r.title || '') + ' · 📅 AUFGABEN ' + (r.missionsDone || 0) + '/3';
+      if (r.newAch) extra += '<br>🏅 ' + r.newAch + (r.newAch === 1 ? ' NEUER ERFOLG' : ' NEUE ERFOLGE');
       if (r.unlockedAreas && r.unlockedAreas.length) extra += '<br>🗺️ NEUER BEREICH: ' + r.unlockedAreas.map(U.esc).join(', ');
       if (r.forbidden) extra += '<br>💀 ULTRA RARE FREIGESCHALTET: THE FORBIDDEN SCANNER';
       $('go-rewards').innerHTML = extra;
@@ -334,7 +463,7 @@
     share() {
       const r = this.lastResult;
       if (!r) return;
-      const text = 'HALAL HARAM DETECTOR 🔎\nScore: ' + U.fmt(r.score) + ' · Combo: ' + r.maxCombo + ' · Accuracy: ' + r.accuracy + '% · Aura: ' + U.fmtSigned(r.aura) +
+      const text = 'HALAL HARAM DETECTOR 🔎' + (r.mode && r.mode !== 'normal' ? ' · ' + D.MODES[r.mode].name : '') + '\nScore: ' + U.fmt(r.score) + ' · Combo: ' + r.maxCombo + ' · Accuracy: ' + r.accuracy + '% · Aura: ' + U.fmtSigned(r.aura) +
         '\nRang: ' + r.rank[1] + '\n„BROTHER… CHECK THE INGREDIENTS.“';
       let top = true;
       try { top = window.self === window.top; } catch (e) { top = false; }
@@ -381,6 +510,8 @@
         A.unlock();
         if (this.screen === 'game') {
           if (ev.code === 'Escape' || ev.code === 'KeyP') { ev.preventDefault(); return G.paused ? G.resume() : G.pause(); }
+          const pu = { Digit1: 'xray', Digit2: 'slowmo', Digit3: 'dua', Numpad1: 'xray', Numpad2: 'slowmo', Numpad3: 'dua' }[ev.code];
+          if (pu && !ev.repeat) { ev.preventDefault(); return G.usePowerup(pu); }
           const c = KEYS[ev.code];
           if (c && !ev.repeat) {
             // Leertaste/Enter nicht doppelt auslösen, wenn ein Button fokussiert ist

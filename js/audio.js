@@ -218,6 +218,55 @@
       [72, 76, 79, 83, 86, 91].forEach((m, i) => tone(midi(m), 0.35, { at: t + i * 0.06, type: 'triangle', vol: 0.07 }));
       noise(1.2, { at: t, ft: 'highpass', f: 7000, vol: 0.05, a: 0.3 });
     },
+    /* --- 2.0 --- */
+    ring() { // altes Telefon: schnelles Trillern
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      for (let i = 0; i < 8; i++) tone(i % 2 ? 900 : 700, 0.045, { at: t + i * 0.045, type: 'square', vol: 0.05, lp: 3000 });
+    },
+    slap() { // KLATSCH!
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      noise(0.09, { at: t, ft: 'highpass', f: 1800, vol: 0.45, a: 0.001 });
+      noise(0.18, { at: t, ft: 'lowpass', f: 500, vol: 0.3 });
+      tone(160, 0.12, { at: t, type: 'sine', to: 70, vol: 0.3 });
+    },
+    siren() { // Halal-Polizei: wii-wuu
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      for (let i = 0; i < 2; i++) {
+        tone(740, 0.22, { at: t + i * 0.44, type: 'square', vol: 0.045, lp: 2200 });
+        tone(587, 0.22, { at: t + i * 0.44 + 0.22, type: 'square', vol: 0.045, lp: 2200 });
+      }
+    },
+    rush() { // Iftar-Fanfare in Hijaz
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [62, 63, 66, 67, 69, 74].forEach((m, i) => tone(midi(m + 12), i === 5 ? 0.5 : 0.13, { at: t + i * 0.08, type: 'square', vol: 0.07, lp: 3200, vib: i === 5 ? 6 : 0, vibDepth: 12 }));
+      noise(0.6, { at: t, ft: 'highpass', f: 7000, vol: 0.05 });
+    },
+    mashallah() { // glitzerndes Hijaz-Arpeggio
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [74, 75, 78, 79, 81, 86].forEach((m, i) => tone(midi(m), 0.3, { at: t + i * 0.05, type: 'triangle', vol: 0.06 }));
+      for (let i = 0; i < 6; i++) noise(0.05, { at: t + i * 0.06, ft: 'highpass', f: 8000, vol: 0.05 });
+    },
+    eid() {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      [62, 66, 69, 74, 78, 81, 86].forEach((m, i) => tone(midi(m), i === 6 ? 0.8 : 0.16, { at: t + i * 0.09, type: i % 2 ? 'square' : 'triangle', vol: 0.08, lp: 5000 }));
+      SFX.crowd('cheer');
+    },
+    powerup() {
+      tone(400, 0.3, { type: 'triangle', to: 1600, slide: 0.25, vol: 0.08 });
+      noise(0.3, { ft: 'highpass', f: 6000, vol: 0.04 });
+    },
+    clink() { // Teeglas
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(2637, 0.25, { at: t, type: 'sine', vol: 0.05 });
+      tone(3520, 0.18, { at: t + 0.07, type: 'sine', vol: 0.035 });
+    },
   };
 
   /* ---------------- Musik-Sequencer ---------------- */
@@ -242,14 +291,44 @@
   function bass(t, m, len, boss) { tone(midi(m), len, { at: t, type: boss ? 'sawtooth' : 'square', vol: 0.12, lp: boss ? 900 : 650, lpTo: 300, dest: musicBus }); }
   function lead(t, m, len, v) { tone(midi(m), len, { at: t, type: 'square', vol: v || 0.035, lp: 3500, dest: musicBus }); }
 
+  /* Darbuka & Hijaz-Skala für den Orient-Musikstil */
+  const HIJAZ = [62, 63, 66, 67, 69, 70, 72, 74, 75, 78]; // D Eb F# G A Bb C D Eb F#
+  const MELODY = [
+    [4, null, 5, null, 4, 3, 2, null, 1, null, 2, null, 0, null, null, null],
+    [0, null, 1, 2, 3, null, 4, null, 5, 4, 3, null, 2, null, 1, null],
+    [3, null, 4, null, 5, null, 6, 5, 4, null, 3, null, 4, null, null, null],
+    [4, null, 3, 2, 1, null, 2, null, 1, null, 0, null, 0, null, null, null],
+  ];
+  const DRONE = [38, 38, 43, 45]; // D D G A
+  function doum(t, v) {
+    const osc = ctx.createOscillator(); const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140, t); osc.frequency.exponentialRampToValueAtTime(55, t + 0.2);
+    env(g, t, v || 0.6, 0.003, 0.32);
+    osc.connect(g); g.connect(musicBus); osc.start(t); osc.stop(t + 0.35);
+    noise(0.06, { at: t, ft: 'lowpass', f: 400, vol: 0.12, dest: musicBus });
+  }
+  function tek(t, v) {
+    noise(0.05, { at: t, ft: 'bandpass', f: 3300, q: 2.5, vol: v || 0.16, dest: musicBus });
+    tone(1150, 0.025, { at: t, type: 'triangle', vol: 0.05, dest: musicBus });
+  }
+  function ka(t, v) { noise(0.035, { at: t, ft: 'bandpass', f: 2300, q: 2, vol: v || 0.07, dest: musicBus }); }
+  function reed(t, m, len, v) { // Zurna/Ney-artige Melodiestimme
+    tone(midi(m), len, { at: t, type: 'sawtooth', vol: v || 0.035, lp: 2400, vib: 5.5, vibDepth: 9, a: 0.02, dest: musicBus });
+  }
+
   const Music = {
     playing: false, step: 0, nextTime: 0, timer: null,
-    st: { mode: 'menu', level: 1, combo: 0, boss: false, panic: false, area: 'street' },
+    st: { mode: 'menu', level: 1, combo: 0, boss: false, panic: false, area: 'street', style: 'arcade', rush: false, slow: false },
     bpm() {
       const s = this.st;
-      if (s.mode === 'menu') return 100;
-      if (s.boss) return 156;
-      return Math.min(172, 116 + (s.level - 1) * 7 + Math.min(s.combo, 60) * 0.3);
+      let b;
+      if (s.mode === 'menu') b = s.style === 'orient' ? 96 : 100;
+      else if (s.boss) b = 156;
+      else b = Math.min(172, 116 + (s.level - 1) * 7 + Math.min(s.combo, 60) * 0.3);
+      if (s.rush) b += 16;
+      if (s.slow) b *= 0.8;
+      return b;
     },
     start(mode) {
       if (!ensure()) return;
@@ -280,6 +359,7 @@
       const stepLen = 60 / this.bpm() / 4;
       if (st16 === 0) Ambience.onBar(t);
       if (!settings.music) return;
+      if (s.style === 'orient') return this.playOrient(step, t, stepLen);
 
       if (s.mode === 'menu') {
         if (st16 === 0 || st16 === 10) kick(t, 0.45);
@@ -313,6 +393,39 @@
     },
   };
 
+  /** Orient-Stil: Darbuka im Maqsum-Rhythmus, Bordun, Hijaz-Melodie */
+  Music.playOrient = function (step, t, stepLen) {
+    const s = this.st;
+    const st16 = step % 16;
+    const bar = Math.floor(step / 16) % 4;
+    const menu = s.mode === 'menu';
+    const hot = s.boss || s.rush || s.combo >= 20 || s.level >= 6;
+    // Maqsum: DUM tek . tek DUM . tek .
+    if (st16 === 0 || st16 === 8) doum(t, menu ? 0.4 : 0.6);
+    if (s.boss && (st16 === 3 || st16 === 11)) doum(t, 0.45);
+    if (st16 === 2 || st16 === 6 || st16 === 12) tek(t, menu ? 0.1 : 0.16);
+    if (!menu && (st16 === 4 || st16 === 10 || st16 === 14) && (s.combo >= 5 || s.level >= 3 || hot)) ka(t);
+    if (hot && st16 % 2 === 1) ka(t, 0.05);
+    if (s.rush) noise(0.03, { at: t, ft: 'highpass', f: 8500, vol: 0.05, dest: musicBus }); // Tamburin
+    if (s.panic) { tek(t + stepLen / 2, 0.1); }
+    // Bordun
+    if (st16 === 0) {
+      const root = DRONE[bar];
+      tone(midi(root), stepLen * 15, { at: t, type: 'sawtooth', vol: menu ? 0.05 : 0.07, lp: 520, dest: musicBus });
+      tone(midi(root + 7), stepLen * 15, { at: t, type: 'triangle', vol: 0.03, dest: musicBus });
+    }
+    // Melodie
+    const melodyOn = menu ? bar % 2 === 0 : s.combo >= 3 || s.level >= 2 || s.boss || s.rush;
+    const idx = MELODY[bar][st16];
+    if (melodyOn && idx != null) {
+      let len = stepLen * 1.8;
+      if (MELODY[bar][(st16 + 1) % 16] == null) len = stepLen * 2.6;
+      const octave = hot && !menu ? 12 : 0;
+      reed(t, HIJAZ[idx] + octave, len, menu ? 0.028 : 0.036);
+    }
+    if (!menu && hot && st16 % 2 === 0 && idx == null) reed(t, HIJAZ[(step >> 1) % 5] + 12, stepLen * 0.8, 0.018);
+  };
+
   /* ---------------- Ambience pro Bereich ---------------- */
   const Ambience = {
     area: 'menu', active: false,
@@ -338,6 +451,9 @@
         if (r < 0.2) tone(700, 1.6, o({ type: 'sine', vol: 0.03, vib: 1.5, vibDepth: 140 }));
       } else if (a === 'street') {
         if (r < 0.07) SFX.honk();
+      } else if (a === 'ramadan') {
+        if (r < 0.35) SFX.clink();
+        if (r > 0.75) noise(1.4, o({ ft: 'bandpass', f: 520, q: 1.2, vol: 0.03, a: 0.5 }));
       }
     },
   };
