@@ -941,7 +941,7 @@ body.big-buttons .dbtn .lb { font-size: clamp(17px, 5.2vw, 24px); }
 .pause-card { width: min(100%, 340px); display: flex; flex-direction: column; gap: 12px; padding: 18px; text-align: center; background: #2a1d5a; border: 3px solid var(--out); border-radius: 22px; box-shadow: 0 8px 0 rgba(0, 0, 0, .4); }
 .pause-card h2 { margin: 0; font-family: var(--disp); font-size: 32px; text-shadow: var(--ts2); }
 .pause-card p { margin: 0; color: var(--txt2); font-size: 14px; }
-.pause-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pause-toggles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 
 /* ---------- Spiel-Zustände ---------- */
 #scr-game.shake { animation: shakeS .3s; }
@@ -999,7 +999,7 @@ body.big-buttons .dbtn .lb { font-size: clamp(17px, 5.2vw, 24px); }
 .toggle small { display: block; font-size: 12px; font-weight: 700; color: var(--txt2); }
 .toggle::after { content: 'AUS'; position: absolute; right: 12px; top: 50%; width: 50px; padding: 4px 0; font-size: 12px; font-weight: 900; text-align: center; background: #4a3f73; border: 2px solid var(--out); border-radius: 999px; transform: translateY(-50%); }
 .toggle.on::after { content: 'AN'; background: var(--halal); }
-.pause-toggles .toggle { padding: 10px 8px 34px; text-align: center; font-size: 14px; }
+.pause-toggles .toggle { padding: 10px 4px 34px; text-align: center; font-size: 13.5px; }
 .pause-toggles .toggle::after { top: auto; bottom: 6px; right: 50%; transform: translateX(50%); }
 .set-buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 .set-buttons .btn { font-size: 17px; }

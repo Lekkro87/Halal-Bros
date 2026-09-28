@@ -128,6 +128,9 @@
         this.el['d' + i + '-score'].textContent = U.fmt(p.score);
       });
       if (ok[1] || ok[2]) A.play('correct', 3); else A.play('wrong');
+      // Detector-Stimme verkündet das echte Ergebnis
+      const verdict = it.ans === 'check' ? (it.variant ? it.variant[0] : null) : it.ans;
+      if (verdict) A.say(verdict, ok[1] || ok[2] ? { mood: 'n', delay: 0.05 } : { mood: 'd', delay: 0.3 });
       let info = 'RICHTIG: ' + LABEL[it.ans];
       if (it.ans === 'check' && it.variant) {
         const flag = it.variant[1].find((x) => typeof x === 'string' && x[0] === '!');

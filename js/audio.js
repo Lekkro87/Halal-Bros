@@ -1,10 +1,11 @@
-/* Halal Haram Detector – Sound & Musik (komplett synthetisiert, keine Audiodateien) */
+/* Halal Haram Detector – Sound & Musik (komplett synthetisiert) + Detector-Stimme („HALAL“ / „HARAM“) */
 (function () {
   'use strict';
   const HHD = (window.HHD = window.HHD || {});
 
-  let ctx = null, master = null, sfxBus = null, musicBus = null, ambBus = null, noiseBuf = null, distCurve = null;
-  const settings = { volume: 0.8, music: true, sfx: true };
+  let ctx = null, master = null, sfxBus = null, musicBus = null, ambBus = null, voiceBus = null, noiseBuf = null, distCurve = null;
+  const settings = { volume: 0.8, music: true, sfx: true, voice: true };
+  const MUSIC_LEVEL = 0.55;
   let pitchMul = 1;
 
   function ensure() {
@@ -19,6 +20,17 @@
     sfxBus = ctx.createGain(); sfxBus.connect(master);
     musicBus = ctx.createGain(); musicBus.connect(master);
     ambBus = ctx.createGain(); ambBus.connect(master);
+    // Detector-Stimme: eigener Bus, klingt wie aus dem Lautsprecher des Geräts
+    voiceBus = ctx.createGain();
+    const vHp = ctx.createBiquadFilter(); vHp.type = 'highpass'; vHp.frequency.value = 160;
+    const vPk = ctx.createBiquadFilter(); vPk.type = 'peaking'; vPk.frequency.value = 2600; vPk.Q.value = 0.9; vPk.gain.value = 4;
+    voiceBus.connect(vHp); vHp.connect(vPk); vPk.connect(master);
+    // Hall für die dramatische Variante
+    const echo = ctx.createDelay(0.5); echo.delayTime.value = 0.14;
+    const fb = ctx.createGain(); fb.gain.value = 0.3;
+    const wet = ctx.createGain(); wet.gain.value = 0.35;
+    echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(voiceBus);
+    voice.echo = echo;
     const len = ctx.sampleRate * 2;
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const ch = noiseBuf.getChannelData(0);
@@ -26,6 +38,7 @@
     distCurve = new Float32Array(1024);
     for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; distCurve[i] = Math.tanh(x * 4); }
     applyVolumes();
+    loadVoice();
     return ctx;
   }
 
@@ -35,7 +48,78 @@
     master.gain.setTargetAtTime(settings.volume * 0.9, t, 0.02);
     sfxBus.gain.setTargetAtTime(settings.sfx ? 1 : 0, t, 0.02);
     ambBus.gain.setTargetAtTime(settings.sfx ? 0.55 : 0, t, 0.05);
-    musicBus.gain.setTargetAtTime(settings.music ? 0.55 : 0, t, 0.05);
+    voiceBus.gain.setTargetAtTime(settings.voice ? 1 : 0, t, 0.02);
+    musicBus.gain.cancelScheduledValues(t); // laufendes Ducking der Stimme verwerfen
+    musicBus.gain.setTargetAtTime(settings.music ? MUSIC_LEVEL : 0, t, 0.05);
+  }
+
+  /* ---------------- Detector-Stimme („HALAL“ / „HARAM“) ---------------- */
+  const voice = { bufs: {}, srcs: [], out: null, loading: false, echo: null };
+
+  /** Eingebettete MP3s (js/voicedata.js) einmalig dekodieren */
+  function loadVoice() {
+    const data = HHD.VOICE;
+    if (!ctx || !data || voice.loading) return;
+    voice.loading = true;
+    Object.keys(data).forEach((word) => Object.keys(data[word]).forEach((mood) => {
+      try {
+        const bin = atob(data[word][mood]);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const p = ctx.decodeAudioData(bytes.buffer, (b) => { voice.bufs[word + '_' + mood] = b; }, () => {});
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* ohne Stimme geht's auch */ }
+    }));
+  }
+
+  /** Vorherige Ansage kurz ausblenden (kein Knacksen) und stoppen */
+  function stopVoice(t) {
+    if (voice.out) voice.out.gain.setTargetAtTime(0, t, 0.008);
+    voice.srcs.forEach((s) => { try { s.stop(t + 0.05); } catch (e) { /* schon beendet */ } });
+    voice.srcs = [];
+  }
+
+  /** Musik kurz leiser, solange der Detector spricht */
+  function duck(t, dur) {
+    if (!settings.music) return;
+    const g = musicBus.gain;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(MUSIC_LEVEL * 0.35, t, 0.03);
+    g.setTargetAtTime(MUSIC_LEVEL, t + dur, 0.15);
+  }
+
+  /**
+   * Der Detector sagt „HALAL“ oder „HARAM“.
+   * o.mood: 'n' normal · 'd' dramatisch (tiefer, mit Hall) · 'h' Hype
+   * o.delay: Verzögerung in s · o.rate: Tempo · o.glitch: „HA-HA-HALAL“ (überhitzter Detector)
+   */
+  function say(word, o) {
+    o = o || {};
+    if (!ctx || !settings.voice || ctx.state !== 'running') return false;
+    const buf = voice.bufs[word + '_' + (o.mood || 'n')] || voice.bufs[word + '_n'];
+    if (!buf) return false;
+    const t = ctx.currentTime + (o.delay || 0);
+    stopVoice(t); // immer nur eine Ansage gleichzeitig
+    // Skins klingen leicht unterschiedlich (wie bei den Beeps), aber nie zu verzerrt
+    const rate = Math.min(1.12, Math.max(0.9, 1 + (pitchMul - 1) * 0.45)) * (o.rate || 1);
+    const out = ctx.createGain();
+    out.gain.value = 0.95;
+    out.connect(voiceBus);
+    voice.out = out;
+    if (o.mood === 'd' && voice.echo) out.connect(voice.echo);
+    const part = (at, dur) => {
+      const s = ctx.createBufferSource();
+      s.buffer = buf;
+      s.playbackRate.value = rate;
+      s.connect(out);
+      if (dur) s.start(at, 0, dur); else s.start(at);
+      voice.srcs.push(s);
+    };
+    let start = t;
+    if (o.glitch) { part(t, 0.1); part(t + 0.11, 0.1); start = t + 0.22; }
+    part(start);
+    duck(t, start - t + buf.duration / rate);
+    return true;
   }
 
   function env(g, t, vol, a, dur) {
@@ -464,9 +548,14 @@
       if (c && c.state === 'suspended') c.resume();
     },
     configure(s) {
-      settings.volume = s.volume; settings.music = s.music; settings.sfx = s.sfx;
+      settings.volume = s.volume; settings.music = s.music; settings.sfx = s.sfx; settings.voice = s.voice !== false;
       applyVolumes();
     },
+    /** Detector-Stimme: gibt true zurück, wenn wirklich gesprochen wird */
+    say(word, o) {
+      try { return say(word, o); } catch (e) { return false; }
+    },
+    voiceReady() { return Object.keys(voice.bufs).length; },
     setSkinPitch(p) { pitchMul = p || 1; },
     play(name, arg) {
       if (!ctx || !settings.sfx || ctx.state !== 'running') return;

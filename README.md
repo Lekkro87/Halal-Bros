@@ -52,7 +52,8 @@ Optional in den Settings: **Swipe-Steuerung** (links = HALAL, tippen = INGREDIEN
 - **Tutorial** mit dem Döner-Meister („WHAT IS THIS?“ → „NOW DON’T GUESS.“ → „WHEN YOU DON’T KNOW, CHECK.“).
 - **Shop mit 12 Detector-Skins und Power-ups:** Default, Gold (5000), Neon (Cyber), Döner Edition, Banana Edition, Grandma Edition (Teppichklopfer), das Ultra Rare *THE FORBIDDEN SCANNER* (nur durch Combo 75) und die fünf neuen Skins aus 2.0.
 - **Progression:** XP schalten Stadtbereiche frei, Coins kaufen Skins, lokale Ranglisten (Score, Combo, schnellste Reaktion, meiste richtige Entscheidungen, Aura, schnellster Zutaten-Check), persönliche Bestleistung und Tagesrekord.
-- **Sound & Musik komplett synthetisiert** (Web Audio, keine Audiodateien): Scanner-Beeps, Fehler-Sounds, Bass-Meme-Boom, Crowd-Reaktionen, Döner-Grill und Supermarkt-Durchsagen. Der Beat wird mit Level und Combo schneller, im Bossfight dramatisch und in den letzten Millisekunden hektisch.
+- **🗣️ Detector-Stimme:** Nach jeder Entscheidung sagt der Detector laut, was das Produkt wirklich ist: **„HALAL“** oder **„HARAM“**. Bei Zutaten-Produkten sagt er es erst, wenn die Zutaten aufgedeckt sind; wer nie nachschaut, erfährt es auch nicht. Es gibt drei Tonlagen: normal, dramatisch mit Hall bei Fehlern und Hype ab Combo 10. In Level 7 stottert der überhitzte Detector („HA-HA-HALAL“), und jeder Skin klingt etwas anders. Während er spricht, wird die Musik leiser. Die Stimme läuft auch im Tutorial und im Duell und lässt sich in den Settings und im Pause-Menü abschalten.
+- **Sound & Musik komplett synthetisiert** (Web Audio, bis auf die Stimme keine Audiodateien): Scanner-Beeps, Fehler-Sounds, Bass-Meme-Boom, Crowd-Reaktionen, Döner-Grill und Supermarkt-Durchsagen. Der Beat wird mit Level und Combo schneller, im Bossfight dramatisch und in den letzten Millisekunden hektisch.
 - **Barrierefreiheit:** reduzierte Animationen (respektiert auch die System-Einstellung), reduzierte Bildschirm-Effekte, größere Buttons, Lautstärke, Musik/Sounds getrennt schaltbar, zusätzliche Muster auf den Buttons. Farbe ist nie das einzige Signal (Symbol + Text + feste Position).
 - **Performance:** Vanilla JS ohne Framework. Die Stadt wird auf einem Canvas mit vorgerenderten Sprites gezeichnet (unter 1 ms pro Frame), Partikel und Produkt-Elemente werden aus Pools wiederverwendet. Mobile-first.
 
@@ -101,7 +102,8 @@ js/data.js            Spielinhalte: Produkte, Zutaten-Varianten, Level, Bereiche
 js/data2.js           Inhalte 2.0: Iftar-Gerichte, Familie, Halal-Polizei, Modi, Power-ups, Aufgaben, Erfolge, Ränge
 js/meta.js            Tagesaufgaben, Erfolge, Lexikon, Ränge, Tagesbonus
 js/store.js           Lokale Speicherung (localStorage): Fortschritt, Rekorde, Ranglisten, Settings
-js/audio.js           Synthetisierte Soundeffekte, Musik-Sequencer, Ambience
+js/voicedata.js       Detector-Stimme „HALAL“ / „HARAM“ (6 kleine MP3s, eingebettet – erzeugt mit tools/make-voice.sh)
+js/audio.js           Synthetisierte Soundeffekte, Musik-Sequencer, Ambience, Detector-Stimme
 js/art.js             Produkt-, Detector- und NPC-Markup
 js/world.js           Lebendige Stadt im Hintergrund (Canvas): Läden, Passanten, Busse, Stadtscan, Ramadan-Nacht
 js/fx.js              Partikel, schwebende Texte, Flash, Screenshake, Banner, Toasts
@@ -112,9 +114,11 @@ js/main.js            Start & Haupt-Loop
 sw.js                 Service Worker (offline spielbar)
 manifest.webmanifest  PWA-Manifest
 assets/               Icons & Schriften
+tools/make-voice.sh   Erzeugt js/voicedata.js neu (SVOX Pico + SoX + LAME)
 ```
 
 ## 📜 Credits
 
 - Schriften: [Lilita One](https://fonts.google.com/specimen/Lilita+One) und [Nunito](https://fonts.google.com/specimen/Nunito), beide unter der SIL Open Font License (siehe `assets/fonts/`), lokal eingebunden (keine Anfragen an Google).
+- Detector-Stimme: erzeugt mit der Sprachsynthese [SVOX Pico](https://android.googlesource.com/platform/external/svox/) (Apache License 2.0), geschnitten mit SoX, kodiert mit LAME. Neu erzeugen mit `bash tools/make-voice.sh` (benötigt `libttspico-utils`, `sox`, `lame`).
 - Emojis kommen aus dem System des Geräts.

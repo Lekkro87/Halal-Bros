@@ -19,6 +19,7 @@
       volume: 0.8,
       music: true,
       sfx: true,
+      voice: true,
       swipe: false,
       reduceMotion: false,
       reduceFx: false,

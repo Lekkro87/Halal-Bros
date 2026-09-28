@@ -823,6 +823,18 @@
       return Math.round(p / 10) * 10;
     },
 
+    /** Detector-Stimme: sagt das echte Ergebnis („HALAL“ / „HARAM“). true = es wurde gesprochen */
+    announce(verdict, mood, delay) {
+      if (verdict !== 'halal' && verdict !== 'haram') return false;
+      const n = this.run ? this.run.level.n : 1;
+      return A.say(verdict, { mood, delay, rate: n >= 5 ? 1.06 : 1, glitch: n >= 7 && U.chance(0.3) });
+    },
+    /** Echtes Urteil eines Produkts – bei Zutaten-Produkten erst, wenn die Zutaten aufgedeckt sind */
+    verdictOf(cur, revealed) {
+      if (cur.ans !== 'check') return cur.ans;
+      return revealed && cur.variant ? cur.variant.verdict : null;
+    },
+
     correct(rt, o) {
       const run = this.run, cur = this.cur;
       cur.decided = true;
@@ -881,8 +893,9 @@
 
       // Präsentation
       this.det('BEEP BEEP BEEP', 'CLASSIFICATION ACCEPTED', 'ok');
+      const spoke = this.announce(this.verdictOf(cur, true), run.combo >= 10 ? 'h' : 'n', 0.04);
       A.play('correct', run.combo);
-      A.play('accept');
+      if (!spoke) A.play('accept');
       const c = this.itemCenter();
       const skin = D.SKINS.find((s) => s.id === HHD.Store.data.skin) || D.SKINS[0];
       FX.burst(c.x, c.y, { n: 18 + Math.min(40, run.combo), colors: [skin.laser, '#ffffff', '#ffe45e', '#5ec8ff'] });
@@ -967,8 +980,10 @@
 
       this.det('ERROR 404', 'COMMON SENSE NOT FOUND', 'err');
       A.play('wrong');
+      // Timeout bei einem Zutaten-Produkt: Zutaten wurden nie gelesen → nichts verraten
+      const spoke = this.announce(this.verdictOf(cur, kind !== 'timeout'), 'd', 0.3);
       if (big) { A.play('boom'); A.play('crowd', 'ooh'); this.terlikThrow(); }
-      else if (U.chance(0.4)) A.play('error404');
+      else if (!spoke && U.chance(0.4)) A.play('error404');
       FX.flash('rgba(255,40,70,0.35)');
       FX.shake(big ? 'big' : 'small');
       const c = this.itemCenter();
@@ -1002,6 +1017,7 @@
         this.addAura(-300);
         this.det('GERATEN ERKANNT', 'TRUST LEVEL: 12%', 'warn');
         A.play('overcheck');
+        this.announce(cur.variant.verdict, 'n', 0.12);
         const c = this.itemCenter();
         FX.float('−300 AURA', c.x, c.y - 20, 'neg');
         this.memeText(U.pick(D.LINES.lucky), this.checkReveal(cur), 'warn', CHOICE_LABEL.check);
@@ -1041,6 +1057,7 @@
       this.addAura(-100);
       this.det('OVERTHINKING', 'DETECTED', 'warn');
       A.play('overcheck');
+      this.announce(cur.ans, 'n', 0.12);
       const c = this.itemCenter();
       FX.float('−100 AURA', c.x, c.y - 20, 'neg');
       this.memeText(line, sub + ' (Nächstes Mal kostet’s ein ❤️)', 'warn', CHOICE_LABEL[cur.ans]);
@@ -1688,7 +1705,8 @@
       }
       this.state = 'feedback';
       this.cur.decided = true;
-      A.play('correct', 1); A.play('accept');
+      if (!this.announce(s.expect, 'n', 0.04)) A.play('accept');
+      A.play('correct', 1);
       this.det('BEEP BEEP BEEP', 'CLASSIFICATION ACCEPTED', 'ok');
       const c = this.itemCenter();
       FX.burst(c.x, c.y, { n: 24 });
@@ -1713,7 +1731,8 @@
       this.chk = null;
       this.closeCheck();
       this.tutClear();
-      A.play('correct', 3); A.play('accept'); A.play('crowd', 'cheer');
+      if (!this.announce('haram', 'h', 0.04)) A.play('accept');
+      A.play('correct', 3); A.play('crowd', 'cheer');
       this.det('BEEP BEEP BEEP', 'CLASSIFICATION ACCEPTED', 'ok');
       const c = this.itemCenter();
       FX.burst(c.x, c.y, { n: 40 });

@@ -393,6 +393,8 @@
       S.save();
       this.applySettings();
       this.renderSettings();
+      // Stimme gleich zum Anhören
+      if (key === 'voice' && s.voice) { A.unlock(); A.say(U.pick(['halal', 'haram']), { delay: 0.05 }); }
     },
     applySettings() {
       const s = S.settings;
